@@ -51,182 +51,175 @@
   background-color: #7d5230;
 }
 
-.searchButton:disabled {
-  background-color: #3a2a1a;
-  cursor: not-allowed;
-}
-
-.error {
-  background-color: rgba(180, 30, 30, 0.3);
-  border: 1px solid #b41e1e;
-  padding: 1rem;
-  border-radius: 0.25rem;
-  margin: 1rem 0;
-}
-
-.error a {
-  color: #ffcc00;
-  text-decoration: underline;
-}
-
-.loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 200px;
-}
-
 .armoryContent {
-  display: grid;
-  grid-template-columns: 1fr 3fr;
+  display: flex;
+  flex-direction: column;
   gap: 2rem;
 }
 
-.characterListSidebar {
-  width: 250px;
-  min-width: 250px;
-  background-color: #1a1a1a;
-  border: 1px solid #3d3d3d;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  height: fit-content;
-  max-height: 600px;
-  margin-right: 1rem;
-}
-
-.characterListVertical {
-  max-height: 500px;
-  overflow-y: auto;
-  /* Custom scrollbar for webkit browsers */
-  scrollbar-width: thin;
-  scrollbar-color: #af6025 #2a2a2a;
-}
-
-.characterListVertical::-webkit-scrollbar {
-  width: 8px;
-}
-
-.characterListVertical::-webkit-scrollbar-track {
-  background: #2a2a2a;
-  border-radius: 4px;
-}
-
-.characterListVertical::-webkit-scrollbar-thumb {
-  background-color: #af6025;
-  border-radius: 4px;
-}
-
 .characterList {
-  width: 250px;
-  background-color: #1a1a1a;
-  border: 1px solid #3d3d3d;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  height: fit-content;
-  max-height: 600px;
-}
-
-.characterListInner {
   display: flex;
-  flex-direction: column;
-  height: 100%;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
-.characterListScroll {
-  overflow-y: auto;
-  max-height: 500px;
-  /* Custom scrollbar for webkit browsers */
-  scrollbar-width: thin;
-  scrollbar-color: #af6025 #2a2a2a;
-}
-
-.characterListScroll::-webkit-scrollbar {
-  width: 8px;
-}
-
-.characterListScroll::-webkit-scrollbar-track {
-  background: #2a2a2a;
-  border-radius: 4px;
-}
-
-.characterListScroll::-webkit-scrollbar-thumb {
-  background-color: #af6025;
-  border-radius: 4px;
-}
-
-.characterItem {
-  padding: 0.75rem;
+.characterCard {
+  background-color: rgba(30, 30, 30, 0.8);
+  border: 1px solid #444;
   border-radius: 0.25rem;
+  padding: 1rem;
+  min-width: 200px;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 1px solid transparent;
-  margin-bottom: 0.5rem;
-  background-color: #252525;
 }
 
-.characterItem:hover {
-  background-color: #2a2a2a;
-  border-color: #3d3d3d;
+.characterCard:hover {
+  background-color: rgba(40, 40, 40, 0.8);
+  border-color: #af6025;
 }
 
-.selectedCharacter {
-  background-color: #2a2a2a;
-  border-left: 4px solid #af6025;
-}
-
-.characterInfo {
-  display: flex;
-  flex-direction: column;
+.characterCard.selected {
+  background-color: rgba(50, 40, 30, 0.8);
+  border-color: #af6025;
 }
 
 .characterName {
   font-weight: 600;
-  color: #af6025;
-  margin-bottom: 0.25rem;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
 }
 
 .characterDetails {
   display: flex;
-  flex-direction: column;
-  font-size: 0.875rem;
-  color: #a38d6d;
+  justify-content: space-between;
+  color: #aaa;
+  font-size: 0.9rem;
 }
 
 .characterClass {
-  margin-right: 0.5rem;
+  color: #af6025;
+}
+
+.characterLevel {
+  color: #8a8a8a;
+}
+
+.characterLeague {
+  font-style: italic;
+  color: #6a6a6a;
+}
+
+.loadingMessage {
+  text-align: center;
+  padding: 2rem;
+  color: #aaa;
+}
+
+.errorMessage {
+  background-color: rgba(100, 30, 30, 0.8);
+  color: white;
+  padding: 1rem;
+  border-radius: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.characterInfo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.characterAvatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #af6025;
+}
+
+.characterAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.characterStats {
+  flex: 1;
+  min-width: 200px;
 }
 
 .characterHeader {
   display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.characterTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.statsList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+
+.statItem {
+  display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
   background-color: rgba(30, 30, 30, 0.8);
-  padding: 1.5rem;
-  border-radius: 0.5rem;
-  border: 1px solid #444;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
 }
 
-.characterHeader h2 {
-  font-size: 1.8rem;
-  color: #d4af37;
-  margin: 0;
+.statLabel {
+  color: #aaa;
 }
 
-.characterInfo {
-  text-align: right;
+.statValue {
+  font-weight: 600;
 }
 
-.characterInfo p {
-  margin: 0.25rem 0;
-  color: #ccc;
+.tabsContainer {
+  margin-bottom: 1rem;
 }
 
-.inventoryContainer {
+.tabsList {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid #444;
+}
+
+.tabItem {
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
   background-color: rgba(30, 30, 30, 0.8);
-  padding: 1.5rem;
-  border-radius: 0.5rem;
   border: 1px solid #444;
+  border-bottom: none;
+  border-radius: 0.25rem 0.25rem 0 0;
+  transition: all 0.2s ease;
+}
+
+.tabItem:hover {
+  background-color: rgba(40, 40, 40, 0.8);
+}
+
+.tabItem.active {
+  background-color: rgba(50, 40, 30, 0.8);
+  border-color: #af6025;
+  color: #af6025;
+}
+
+.tabContent {
+  padding: 1rem;
+  background-color: rgba(20, 20, 20, 0.8);
+  border: 1px solid #444;
+  border-top: none;
+  border-radius: 0 0 0.25rem 0.25rem;
 }
 
 .equipmentGrid {
@@ -244,109 +237,13 @@
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
 }
 
-.equipmentGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 80px);
-  grid-template-rows: repeat(5, 80px);
-  gap: 8px;
-  position: relative;
-  margin: 0 auto;
-}
-
 .equipmentSlot {
   position: absolute;
-  background-color: transparent;
+  background-color: rgba(10, 10, 40, 0.7);
   overflow: hidden;
-  transition: all 0.2s ease;
+  border: 1px solid #3d3d3d;
 }
 
-.equipmentSlot {
-  width: 80px;
-  height: 80px;
-  background-color: rgba(20, 20, 20, 0.5);
-  border-radius: 4px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-/* Specific slot positions */
-.Weapon {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.Offhand {
-  grid-column: 4;
-  grid-row: 1;
-}
-
-.Helmet {
-  grid-column: 1;
-  grid-row: 2;
-}
-
-.BodyArmour {
-  grid-column: 4;
-  grid-row: 2;
-}
-
-.Gloves {
-  grid-column: 1;
-  grid-row: 3;
-}
-
-.Boots {
-  grid-column: 4;
-  grid-row: 3;
-}
-
-.Ring {
-  grid-column: 1;
-  grid-row: 4;
-}
-
-.Ring2 {
-  grid-column: 4;
-  grid-row: 4;
-}
-
-.Amulet {
-  grid-column: 1;
-  grid-row: 5;
-}
-
-.Belt {
-  grid-column: 4;
-  grid-row: 5;
-}
-
-.Flask {
-  grid-column: 2;
-  grid-row: 5;
-}
-
-.Flask2 {
-  grid-column: 2;
-  grid-row: 4;
-}
-
-.Flask3 {
-  grid-column: 2;
-  grid-row: 3;
-}
-
-.Flask4 {
-  grid-column: 3;
-  grid-row: 5;
-}
-
-.Flask5 {
-  grid-column: 3;
-  grid-row: 4;
-}
-
-/* Weapon slots */
 .slotWeapon {
   left: 6%;
   top: 21%;
@@ -361,7 +258,6 @@
   height: 36%;
 }
 
-/* Armor slots */
 .slotHelm {
   left: 50%;
   top: 19%;
@@ -392,10 +288,8 @@
   height: 17%;
 }
 
-/* Jewelry slots */
 .slotAmulet {
   left: 63%;
-  /* transform: translateX(-50%); */
   top: 37%;
   width: 9%;
   height: 9%;
@@ -423,7 +317,6 @@
   height: 8%;
 }
 
-/* Flask slots */
 .slotFlask {
   left: 28.5%;
   bottom: 2.5%;
@@ -460,72 +353,30 @@
   height: 17.5%;
 }
 
-.slotName {
-  display: none;
-}
-
 .item {
-  background-color: rgba(0, 0, 0, 0.5);
-  border: 1px solid #3a3a3a;
-  border-radius: 0;
-  overflow: hidden;
-  margin: 0;
-  height: 100%;
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
-}
-
-.itemHeader {
-  display: none;
-}
-
-.itemContent {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   height: 100%;
-  width: 100%;
-  padding: 2px;
-}
-
-.itemImage {
-  height: 100%;
-  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  background-color: rgba(0, 0, 50, 0.7);
+  cursor: pointer;
 }
 
-.itemImage img {
-  max-width: 90%;
-  max-height: 90%;
-  object-fit: contain;
-  display: block;
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.3));
-}
-
-.emptySlot {
-  height: 100%;
+.itemIcon {
   width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 50, 0.3);
-  border: 1px solid #3a3a3a;
 }
 
-.inventoryTitle {
-  display: none;
+.itemIcon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-/* Tooltip styles */
 .itemTooltip {
   position: fixed;
   z-index: 1000;
@@ -572,631 +423,27 @@
   background-color: #c27b3e;
 }
 
-.tooltipHeader {
-  margin-bottom: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #444;
-}
-
-.tooltipName {
-  font-weight: bold;
-  font-size: 16px;
-}
-
-.tooltipType {
-  font-size: 14px;
-  color: #aaa;
-}
-
-.tooltipSection {
-  margin-bottom: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #333;
-}
-
-.tooltipSection:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-.tooltipProperty {
-  margin-bottom: 2px;
-  color: #8888ff;
-}
-
-.tooltipRequirements {
-  color: #aaa;
-}
-
-.tooltipImplicitMods {
-  color: #7da5ff;
-}
-
-.tooltipExplicitMods {
-  color: #8888ff;
-}
-
-.tooltipCraftedMods {
-  color: #b4c2ff;
-}
-
-.tooltipEnchantMods {
-  color: #b4a0ff;
-}
-
-.tooltipCorrupted {
-  color: #ff6666;
-  margin-top: 8px;
-}
-
-/* Rarity colors */
-.normal {
-  color: #c8c8c8;
-}
-
-.magic {
-  color: #8888ff;
-}
-
-.rare {
-  color: #ffff77;
-}
-
-.unique {
-  color: #af6025;
-}
-
-.gem {
-  color: #1ba29b;
-}
-
-.currency {
-  color: #aa9e82;
-}
-
-.divination {
-  color: #0ebaff;
-}
-
-.quest {
-  color: #4ae63a;
-}
-
-.prophecy {
-  color: #b54bff;
-}
-
-.relic {
-  color: #82ad6a;
-}
-
-/* Custom scrollbar styling */
-.characterScroller {
-  overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #af6025 #252525;
-}
-
-.characterScroller::-webkit-scrollbar {
-  height: 8px;
-}
-
-.characterScroller::-webkit-scrollbar-track {
-  background: #252525;
-  border-radius: 10px;
-}
-
-.characterScroller::-webkit-scrollbar-thumb {
-  background-color: #af6025;
-  border-radius: 10px;
-  border: 2px solid #252525;
-}
-
-.characterScroller::-webkit-scrollbar-thumb:hover {
-  background-color: #c27b3e;
-}
-
-/* Character Avatar */
-.characterAvatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 8px;
-  border: 2px solid #af6025;
-  background-color: #1c1c1c;
-  overflow: hidden;
-  box-shadow: 0 0 10px rgba(175, 96, 37, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-}
-
-.characterAvatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .equipmentGrid {
-    max-width: 100%;
-    padding: 60px 15px 15px 15px;
-  }
-
-  .characterListSidebar {
-    width: 100%;
-    margin-right: 0;
-    margin-bottom: 1rem;
-  }
-
-  .characterListVertical {
-    max-height: 300px;
-  }
-}
-
-.passiveTreeSection {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #3d3d3d;
-}
-
-.passiveTreeContainer {
-  width: 100%;
-  height: 500px;
-  background-color: rgba(20, 20, 20, 0.8);
-  border: 1px solid #3d3d3d;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.passiveTreeFrame {
-  width: 100%;
-  height: 100%;
-  border: none;
-}
-
-/* Item frame styles */
-.itemFrame {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border: 2px solid;
-  border-radius: 4px;
-  background-color: rgba(0, 0, 0, 0.8);
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.itemFrame:hover {
-  transform: scale(1.05);
-}
-
-.normal {
-  border-color: #7f7f7f;
-}
-
-.magic {
-  border-color: #88f;
-}
-
-.rare {
-  border-color: #ff7;
-}
-
-.unique {
-  border-color: #af6025;
-}
-
-.gem {
-  border-color: #1ba29b;
-}
-
-.currency {
-  border-color: #aa9e82;
-}
-
-.divination {
-  border-color: #0a9eff;
-}
-
-.prophecy {
-  border-color: #b54bff;
-}
-
-.foil {
-  border-color: #82ad6a;
-}
-
-.itemIcon {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.socketCount {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  color: #fff;
-  font-size: 10px;
-  padding: 1px 3px;
-  border-radius: 2px;
-}
-
-.emptySlot {
-  width: 100%;
-  height: 100%;
-  background-color: rgba(30, 30, 30, 0.5);
-  border: 1px dashed #3d3d3d;
-  border-radius: 4px;
-}
-
-/* Tooltip styles */
-.itemTooltip {
-  position: fixed;
-  z-index: 1000;
-  width: 300px;
-  background-color: rgba(0, 0, 0, 0.9);
-  border: 1px solid #3d3d3d;
-  border-radius: 4px;
-  padding: 8px;
-  color: #fff;
-  font-size: 14px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-}
-
-.itemTooltipVisible {
-  opacity: 1;
-}
-
-.tooltipHeader {
-  padding-bottom: 6px;
-  margin-bottom: 6px;
-  border-bottom: 1px solid #3d3d3d;
-}
-
-.tooltipName {
-  font-weight: bold;
-  font-size: 16px;
-}
-
-.tooltipType {
-  font-size: 12px;
-  margin-top: 2px;
-}
-
-.tooltipSection {
-  margin-bottom: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #333;
-}
-
-.tooltipSection:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-.tooltipProperty, .tooltipRequirement {
-  margin-bottom: 2px;
-}
-
-.tooltipRequirementsHeader {
-  font-weight: bold;
-  margin-bottom: 4px;
-}
-
-.tooltipMod {
-  margin-bottom: 2px;
-}
-
-.tooltipImplicitMods {
-  color: #88f;
-  margin-bottom: 6px;
-}
-
-.tooltipExplicitMods {
-  color: #8cf;
-}
-
-.tooltipCraftedMods {
-  color: #b4c2ff;
-}
-
-.tooltipEnchantMods {
-  color: #b4a0ff;
-}
-
-.tooltipCorrupted {
-  color: #ff6666;
-  margin-top: 8px;
-}
-
-.characterListSidebar {
-  background-color: #1a1a1a;
-  border: 1px solid #3d3d3d;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  height: fit-content;
-  max-height: 600px;
-}
-
-.characterListVertical {
-  max-height: 500px;
-  overflow-y: auto;
-  /* Custom scrollbar for webkit browsers */
-  scrollbar-width: thin;
-  scrollbar-color: #444 #222;
-}
-
-.characterListVertical::-webkit-scrollbar {
-  width: 8px;
-}
-
-.characterListVertical::-webkit-scrollbar-track {
-  background: #222;
-  border-radius: 4px;
-}
-
-.characterListVertical::-webkit-scrollbar-thumb {
-  background-color: #444;
-  border-radius: 4px;
-}
-
-.characterItem {
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  background-color: #2a2a2a;
-  border: 1px solid #3d3d3d;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.characterItem:hover {
-  background-color: #333;
-  border-color: #555;
-}
-
-.characterItem.selected {
-  background-color: #5a3b23;
-  border-color: #7d5230;
-}
-
-.characterName {
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-}
-
-.characterInfo {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  color: #aaa;
-}
-
-.characterClass {
-  color: #ffcc00;
-}
-
-.characterLevel {
-  color: #8fbcbb;
-}
-
-.characterLeague {
-  color: #b48ead;
-}
-
-.characterDetails {
-  flex: 1;
-  background-color: #1a1a1a;
-  border: 1px solid #3d3d3d;
-  border-radius: 0.5rem;
-  padding: 1.5rem;
-  min-height: 600px;
-}
-
-.characterHeader {
+.itemHeader {
   display: flex;
   align-items: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #3d3d3d;
-}
-
-.characterAvatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background-color: #2a2a2a;
-  margin-right: 1.5rem;
-  border: 2px solid #5a3b23;
-}
-
-.characterNameHeader {
-  font-size: 1.8rem;
-  font-weight: 700;
-  margin-bottom: 0.25rem;
-}
-
-.characterMetaInfo {
-  display: flex;
-  gap: 1rem;
-  color: #aaa;
-}
-
-.characterMetaInfo span {
-  display: flex;
-  align-items: center;
-}
-
-.characterMetaInfo span:before {
-  content: '';
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 0.5rem;
-}
-
-.characterMetaInfo .level:before {
-  background-color: #8fbcbb;
-}
-
-.characterMetaInfo .class:before {
-  background-color: #ffcc00;
-}
-
-.characterMetaInfo .league:before {
-  background-color: #b48ead;
-}
-
-.characterStats {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.statItem {
-  background-color: #2a2a2a;
-  border: 1px solid #3d3d3d;
-  border-radius: 0.25rem;
-  padding: 0.75rem;
-}
-
-.statLabel {
-  font-size: 0.85rem;
-  color: #aaa;
-  margin-bottom: 0.25rem;
-}
-
-.statValue {
-  font-size: 1.2rem;
-  font-weight: 600;
-}
-
-.equipmentSection {
-  margin-bottom: 2rem;
-}
-
-.sectionTitle {
-  font-size: 1.4rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  color: #ffcc00;
-}
-
-.equipmentGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(4, auto);
-  gap: 1rem;
-}
-
-.equipmentSlot {
-  background-color: #2a2a2a;
-  border: 1px solid #3d3d3d;
-  border-radius: 0.25rem;
-  padding: 0.75rem;
-  position: relative;
-  min-height: 80px;
-  display: flex;
-  flex-direction: column;
-}
-
-.slotName {
-  font-size: 0.85rem;
-  color: #aaa;
-  margin-bottom: 0.5rem;
+  margin-bottom: 5px;
 }
 
 .itemName {
-  font-weight: 600;
-  margin-bottom: 0.25rem;
+  font-weight: bold;
+  color: #fff;
+  margin-right: 5px;
 }
 
-.itemProps {
-  font-size: 0.85rem;
+.itemType {
   color: #aaa;
-}
-
-.emptySlot {
-  color: #666;
   font-style: italic;
 }
 
-/* Equipment slot positioning */
-.Helmet {
-  grid-column: 2;
-  grid-row: 1;
+.itemRarity {
+  margin-bottom: 5px;
 }
 
-.BodyArmour {
-  grid-column: 2;
-  grid-row: 2;
-}
-
-.Gloves {
-  grid-column: 1;
-  grid-row: 2;
-}
-
-.Boots {
-  grid-column: 3;
-  grid-row: 2;
-}
-
-.Belt {
-  grid-column: 2;
-  grid-row: 3;
-}
-
-.Ring {
-  grid-column: 1;
-  grid-row: 3;
-}
-
-.Ring2 {
-  grid-column: 3;
-  grid-row: 3;
-}
-
-.Amulet {
-  grid-column: 2;
-  grid-row: 4;
-}
-
-.Weapon {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.Offhand {
-  grid-column: 3;
-  grid-row: 1;
-}
-
-.Flask {
-  grid-column: 1;
-  grid-row: 4;
-}
-
-.Flask2 {
-  grid-column: 3;
-  grid-row: 4;
-}
-
-/* Item rarity colors */
 .normal {
   color: #c8c8c8;
 }
@@ -1213,244 +460,126 @@
   color: #af6025;
 }
 
-.gem {
-  color: #1ba29b;
+.itemProperties {
+  border-top: 1px solid #444;
+  padding-top: 5px;
+  margin-top: 5px;
 }
 
-.currency {
-  color: #aa9e82;
+.itemProperty {
+  margin-bottom: 3px;
 }
 
-.divination {
-  color: #0ebaff;
-}
-
-.questItem {
-  color: #4ae63a;
-}
-
-.prophecy {
-  color: #b54bff;
-}
-
-.relic {
-  color: #82ad6a;
-}
-
-/* Tooltip styles */
-.tooltip {
-  position: absolute;
-  z-index: 1000;
-  background-color: #1a1a1a;
-  border: 1px solid #3d3d3d;
-  border-radius: 0.25rem;
-  padding: 1rem;
-  min-width: 300px;
-  max-width: 400px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.tooltip.visible {
-  opacity: 1;
-}
-
-.tooltipHeader {
-  margin-bottom: 0.5rem;
-}
-
-.tooltipItemName {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-}
-
-.tooltipItemType {
-  font-size: 0.85rem;
+.itemRequirements {
+  border-top: 1px solid #444;
+  padding-top: 5px;
+  margin-top: 5px;
   color: #aaa;
 }
 
-.tooltipDivider {
-  height: 1px;
-  background-color: #3d3d3d;
-  margin: 0.5rem 0;
+.itemMods {
+  border-top: 1px solid #444;
+  padding-top: 5px;
+  margin-top: 5px;
 }
 
-.tooltipProperty {
-  margin-bottom: 0.25rem;
+.itemMod {
+  margin-bottom: 3px;
 }
 
-.tooltipPropertyLabel {
-  color: #aaa;
+.explicitMod {
+  color: #8888ff;
 }
 
-.tooltipPropertyValue {
-  float: right;
+.implicitMod {
+  color: #b8b8ff;
 }
 
-.tooltipMods {
-  margin: 0.5rem 0;
+.craftedMod {
+  color: #b8c8ff;
 }
 
-.tooltipMod {
-  margin-bottom: 0.25rem;
-  color: #8fbcbb;
+.enchantMod {
+  color: #b8b8ff;
 }
 
-.tooltipRequirements {
-  font-size: 0.85rem;
-  color: #aaa;
-  margin-top: 0.5rem;
-}
-
-.tooltipRequirement {
-  display: inline-block;
-  margin-right: 1rem;
-}
-
-.tooltipRequirementValue {
-  color: white;
-}
-
-.tooltipSockets {
-  display: flex;
-  margin: 0.5rem 0;
-}
-
-.tooltipSocket {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  margin-right: 0.25rem;
-  border: 1px solid #3d3d3d;
-}
-
-.tooltipSocketR {
-  background-color: #ff4444;
-}
-
-.tooltipSocketG {
-  background-color: #44ff44;
-}
-
-.tooltipSocketB {
-  background-color: #4444ff;
-}
-
-.tooltipSocketW {
-  background-color: #ffffff;
-}
-
-.tooltipSocketA {
-  background-color: #aa9e82;
-}
-
-.tooltipLink {
-  width: 10px;
-  height: 2px;
-  background-color: #3d3d3d;
-  align-self: center;
-  margin: 0 -2px;
-}
-
-.tooltipLink.linked {
-  background-color: #aaa;
-}
-
-.tooltipItemLevel {
-  font-size: 0.85rem;
-  color: #aaa;
-  margin-top: 0.5rem;
+.corrupted {
+  color: #ff7777;
+  margin-top: 5px;
 }
 
 .wikiLink {
   position: absolute;
-  bottom: 5px;
+  top: 5px;
   right: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 20px;
   height: 20px;
-  background-color: #3d3d3d;
+  background-color: rgba(0, 0, 0, 0.7);
   border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: white;
   text-decoration: none;
+  z-index: 5;
 }
 
-.wikiLink:hover {
-  background-color: #5a3b23;
-}
-
-.passiveTreeSection {
-  margin-top: 2rem;
+.wikiLinkIcon {
+  color: #af6025;
+  font-weight: bold;
+  font-size: 12px;
 }
 
 .passiveTreeContainer {
-  background-color: #2a2a2a;
-  border: 1px solid #3d3d3d;
-  border-radius: 0.25rem;
-  padding: 1rem;
-  min-height: 400px;
-  position: relative;
-}
-
-.passiveTreePlaceholder {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 400px;
-  color: #aaa;
-  font-style: italic;
-}
-
-.passiveTreeLoading {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 10;
-}
-
-.tooltipFooter {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #3d3d3d;
-  text-align: center;
-  font-size: 0.85rem;
-  color: #aaa;
-}
-
-.characterInventoryLayout {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  grid-template-rows: repeat(5, 1fr);
-  gap: 4px;
-  background-image: url('/images/inventory/armour_layout.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
   width: 100%;
-  height: 400px;
-  margin-top: 2rem;
-  position: relative;
+  height: 600px;
+  background-color: rgba(10, 10, 10, 0.8);
+  border: 1px solid #444;
+  border-radius: 4px;
+  overflow: hidden;
 }
 
-.inventorySlot {
-  position: relative;
-  border: 1px solid transparent;
+.passiveTreeControls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
-.inventorySlot:hover {
-  border-color: #ffcc00;
+.passiveTreeControl {
+  padding: 5px 10px;
+  background-color: #333;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+}
+
+.passiveTreeControl:hover {
+  background-color: #444;
+}
+
+.passiveTreeZoomControls {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.zoomButton {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.7);
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.zoomButton:hover {
+  background-color: rgba(50, 50, 50, 0.7);
 }
