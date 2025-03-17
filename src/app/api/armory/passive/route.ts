@@ -20,7 +20,7 @@ function formatAccountName(accountName: string): string {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const accountName = searchParams.get('accountName');
-  const characterName = searchParams.get('characterName');
+  const characterName = searchParams.get('character');
   const realm = searchParams.get('realm') || 'pc';
 
   console.log('Passive API Request received:', {

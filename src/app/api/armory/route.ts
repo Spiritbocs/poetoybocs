@@ -44,6 +44,8 @@ const characterCache: Record<string, { data: any, timestamp: number }> = {};
 
 const ACCOUNT_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const CHARACTER_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+let lastRequestTime = 0;
+const REQUEST_DELAY = 1000; // 1 second delay between requests
 
 // Function to get data from cache
 function getFromCache(cache: Record<string, { data: any, timestamp: number }>, key: string, allowStale = false): any {
@@ -473,28 +475,55 @@ async function fetchCharacterData(accountName: string, characterName: string, us
   }
 }
 
+// Helper function to handle rate limiting
+async function fetchWithRateLimitHandling(url: string) {
+  // Ensure we don't make requests too quickly
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastRequestTime;
+  
+  if (timeSinceLastRequest < REQUEST_DELAY) {
+    await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY - timeSinceLastRequest));
+  }
+  
+  lastRequestTime = Date.now();
+  
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    // If we hit a rate limit, respect the Retry-After header
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After');
+      console.log(`Rate limited. Retry after: ${retryAfter} seconds`);
+      
+      // You could implement retry logic here if needed
+      // For now, we'll just return the response and let the caller handle it
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error in fetchWithRateLimitHandling:', error);
+    throw error;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const accountName = searchParams.get('accountName');
-  const characterName = searchParams.get('characterName');
+  const characterName = searchParams.get('character');
   const useStaleCache = searchParams.get('useStaleCache') === 'true';
-
-  console.log('API Request received:', {
-    accountName,
-    characterName,
-    useStaleCache
-  });
-
+  
   if (!accountName) {
     return NextResponse.json({ error: 'Account name is required' }, { status: 400 });
   }
-
+  
+  const formattedAccountName = formatAccountName(accountName);
+  console.log('Formatted account name:', formattedAccountName);
+  
   try {
-    // Format account name for Battle.net style accounts
-    console.log('Formatting Battle.net style account name:', accountName);
-    const formattedAccountName = formatAccountName(accountName);
-    console.log('Formatted account name:', formattedAccountName);
-
     if (characterName) {
       // Fetch specific character data
       const characterData = await fetchCharacterData(formattedAccountName, characterName, useStaleCache);
@@ -525,8 +554,24 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error in API route:', error);
+    
+    // Check for rate limiting
+    if (error && typeof error === 'object' && 'response' in error && 
+        error.response && typeof error.response === 'object' && 
+        'status' in error.response && error.response.status === 429 &&
+        'headers' in error.response && error.response.headers && 
+        typeof error.response.headers === 'object') {
+      const headers = error.response.headers as Record<string, string | number>;
+      const retryAfter = headers['retry-after'] || 60;
+      return NextResponse.json(
+        { error: 'Rate limited by Path of Exile API', retryAfter },
+        { status: 429 }
+      );
+    }
+    
+    // Handle other errors
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'An unknown error occurred' },
+      { error: error instanceof Error ? error.message : 'An error occurred while fetching data' },
       { status: 500 }
     );
   }

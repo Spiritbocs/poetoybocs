@@ -49,8 +49,6 @@ interface CharacterData {
     class: string;
     level: number;
     league: string;
-    classId?: number;
-    ascendancyClass?: number;
   };
   items: Item[];
 }
@@ -101,24 +99,31 @@ function getSlotName(inventoryId: string): string {
 
 // Function to get the frame class based on item rarity
 const getFrameClass = (frameType: number): string => {
-  switch (frameType) {
-    case 0: return styles.normal;
-    case 1: return styles.magic;
-    case 2: return styles.rare;
-    case 3: return styles.unique;
-    case 4: return styles.gem;
-    case 5: return styles.currency;
-    case 6: return styles.divination;
-    case 8: return styles.prophecy;
-    case 9: return styles.foil;
-    default: return styles.normal;
-  }
+  const rarityMap: Record<number, string> = {
+    0: styles.normal,
+    1: styles.magic,
+    2: styles.rare,
+    3: styles.unique,
+    4: styles.gem,
+    5: styles.currency,
+    6: styles.divination,
+    7: styles.quest,
+    8: styles.prophecy,
+    9: styles.relic
+  };
+  
+  return rarityMap[frameType] || styles.normal;
+};
+
+// Function to get the item rarity class
+const getItemRarityClass = (frameType: number): string => {
+  return getFrameClass(frameType);
 };
 
 // Function to fetch passive skills data
-const getPassiveSkills = async (accountName: string, characterName: string) => {
+const getPassiveSkills = async (accountName: string, character: string) => {
   try {
-    const response = await fetch(`/api/armory/passive?accountName=${encodeURIComponent(accountName)}&characterName=${encodeURIComponent(characterName)}`);
+    const response = await fetch(`/api/armory/passive?accountName=${encodeURIComponent(accountName)}&character=${encodeURIComponent(character)}`);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch passive skills: ${response.status}`);
@@ -145,7 +150,37 @@ export default function ArmoryPage() {
   const [showRateLimitWarning, setShowRateLimitWarning] = useState(false);
   const [tooltipItem, setTooltipItem] = useState<Item | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [tooltipVisible, setTooltipVisible] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const [rateLimit, setRateLimit] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') {
+        e.preventDefault();
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') {
+        e.preventDefault();
+      }
+    };
+    
+    const handleBlur = () => {
+      // Handle window blur
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,34 +246,42 @@ export default function ArmoryPage() {
     setSelectedCharacter(characterName);
     setIsLoadingCharacter(true);
     setCharacterData(null);
-    setError('');
     
     try {
       console.log(`Fetching data for character: ${characterName}`);
-      const response = await fetch(`/api/armory?accountName=${encodeURIComponent(accountName)}&characterName=${encodeURIComponent(characterName)}`);
-      const data = await response.json();
-      console.log('Character data response:', data);
+      const response = await fetch(`/api/armory?accountName=${encodeURIComponent(accountName)}&character=${encodeURIComponent(characterName)}`);
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch character data');
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to fetch character data: ${response.status}`);
       }
       
-      setCharacterData(data);
+      const character = await response.json();
       
-      // Fetch passive skills data
-      try {
-        const passiveResponse = await fetch(`/api/armory/passive?accountName=${encodeURIComponent(accountName)}&characterName=${encodeURIComponent(characterName)}`);
-        const passiveData = await passiveResponse.json();
-        console.log('Passive skills data:', passiveData);
-        
-        if (passiveResponse.ok) {
-          setPassiveData(passiveData);
-        } else {
-          console.error('Failed to fetch passive skills:', passiveData.error);
-        }
-      } catch (passiveError) {
-        console.error('Error fetching passive skills:', passiveError);
+      if (!character) {
+        throw new Error('No character data returned');
       }
+      
+      // Log the character data to debug
+      console.log(`Character data for ${characterName}:`, character);
+      
+      // Always ensure there's an items array, even if empty
+      const items = character.items || [];
+      if (!Array.isArray(items)) {
+        console.error('Items is not an array for character:', character);
+        throw new Error('Character items data is invalid (not an array)');
+      }
+      
+      // Format the data to match the expected structure
+      setCharacterData({
+        character: {
+          name: character.name,
+          class: character.class,
+          level: character.level,
+          league: character.league
+        },
+        items: items
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
       console.error('Error fetching character data:', err);
@@ -337,252 +380,152 @@ export default function ArmoryPage() {
 
   const handleItemHover = (e: React.MouseEvent, item: Item) => {
     setTooltipItem(item);
+    setTooltipVisible(true);
     updateTooltipPosition(e);
   };
 
-  const handleItemLeave = () => {
+  const handleItemMouseLeave = () => {
     setTooltipItem(null);
   };
 
   const handleItemMouseMove = (e: React.MouseEvent) => {
-    if (tooltipItem) {
+    if (tooltipVisible) {
       updateTooltipPosition(e);
     }
   };
 
   const updateTooltipPosition = (e: React.MouseEvent) => {
-    const tooltipWidth = 300; // Match this with the CSS width
-    const tooltipHeight = tooltipRef.current?.offsetHeight || 400;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    
-    // Calculate position to keep tooltip within viewport
-    let x = e.clientX + 15;
-    let y = e.clientY + 15;
-    
-    // Adjust horizontal position if tooltip would go off-screen
-    if (x + tooltipWidth > viewportWidth) {
-      x = e.clientX - tooltipWidth - 15;
-    }
-    
-    // Adjust vertical position if tooltip would go off-screen
-    if (y + tooltipHeight > viewportHeight) {
-      y = viewportHeight - tooltipHeight - 15;
-      if (y < 0) y = 15; // If tooltip is taller than viewport, align to top
-    }
-    
+    const x = e.clientX + 15; 
+    const y = e.clientY + 15;
     setTooltipPosition({ x, y });
   };
 
+  const handleItemMouseEnter = (e: React.MouseEvent, item: Item) => {
+    handleItemHover(e, item);
+  };
+
+  const handleTooltipScroll = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const tooltipRect = tooltipRef.current?.getBoundingClientRect();
+    if (tooltipRect) {
+      const x = tooltipRect.left + 15; 
+      const y = tooltipRect.top + 15;
+      setTooltipPosition({ x, y });
+    }
+  };
+
   const renderItem = (item: Item) => {
-    const rarityClass = mapFrameTypeToRarity(item.frameType);
+    if (!item) return null;
+    
+    console.log('Rendering item:', item);
+    
+    const itemRarity = item.frameType !== undefined ? getItemRarityClass(item.frameType) : '';
+    const isUnique = item.frameType === 3;
+    const isFlask = item.inventoryId?.includes('Flask');
     
     return (
       <div 
         className={styles.item}
-        onMouseEnter={(e) => handleItemHover(e, item)}
-        onMouseLeave={handleItemLeave}
+        onMouseEnter={(e) => handleItemMouseEnter(e, item)}
+        onMouseLeave={handleItemMouseLeave}
         onMouseMove={handleItemMouseMove}
       >
-        <div className={`${styles.itemHeader} ${styles[rarityClass]}`}>
-          <div className={styles.itemName}>
-            <span className={styles.itemNameText}>{item.name || item.typeLine}</span>
-            {item.name && <span className={styles.itemType}>{item.typeLine}</span>}
-          </div>
-        </div>
-        <div className={styles.itemContent}>
-          <div className={styles.itemImage}>
-            {item.icon ? (
-              <img 
-                src={item.icon} 
-                alt={item.name || item.typeLine} 
-                onError={(e) => {
-                  // If image fails to load, replace with a placeholder
-                  (e.target as HTMLImageElement).src = "https://web.poecdn.com/image/Art/2DItems/Currency/CurrencyRerollRare.png";
-                  console.error(`Failed to load image for item: ${item.name || item.typeLine}`);
-                }}
-              />
-            ) : (
-              <div className={styles.noImage}>No Image</div>
+        {item.icon && (
+          <div className={styles.itemIcon}>
+            <img src={item.icon} alt={item.name || 'Item'} />
+            {isUnique && (
+              <a 
+                href={`https://www.poewiki.net/wiki/${encodeURIComponent(item.name || '')}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className={styles.wikiLink}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span className={styles.wikiLinkIcon}>?</span>
+              </a>
             )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderEquipmentSlot = (slotId: string) => {
-    if (!characterData) return null;
-    
-    const item = characterData.items.find(i => i.inventoryId === slotId);
-    
-    if (!item) {
-      return <div className={styles.emptySlot}></div>;
-    }
-    
-    return (
-      <div 
-        className={`${styles.itemFrame} ${getFrameClass(item.frameType)}`}
-        onMouseEnter={(e) => handleItemHover(e, item)}
-        onMouseLeave={handleItemLeave}
-      >
-        <img 
-          src={item.icon} 
-          alt={item.name || item.typeLine} 
-          className={styles.itemIcon}
-        />
-        {item.socketedItems && item.socketedItems.length > 0 && (
-          <div className={styles.socketCount}>
-            {item.socketedItems.length}
           </div>
         )}
       </div>
     );
   };
 
+  const renderEquipmentSlot = (slotId: string) => {
+    if (!characterData) return null;
+
+    const item = characterData.items.find(item => item.inventoryId === slotId);
+
+    return item ? renderItem(item) : <div className={styles.emptySlot}></div>;
+  };
+
   // Define slot mappings for the Path of Exile style layout
   const equipmentSlots = [
-    { id: 'Weapon', className: styles.Weapon },
-    { id: 'Offhand', className: styles.Offhand },
-    { id: 'Helmet', className: styles.Helmet },
-    { id: 'BodyArmour', className: styles.BodyArmour },
-    { id: 'Gloves', className: styles.Gloves },
-    { id: 'Boots', className: styles.Boots },
-    { id: 'Ring', className: styles.Ring },
-    { id: 'Ring2', className: styles.Ring2 },
-    { id: 'Amulet', className: styles.Amulet },
-    { id: 'Belt', className: styles.Belt },
-    { id: 'Flask', className: styles.Flask },
-    { id: 'Flask2', className: styles.Flask2 },
-    { id: 'Flask3', className: styles.Flask3 },
-    { id: 'Flask4', className: styles.Flask4 },
-    { id: 'Flask5', className: styles.Flask5 }
+    { id: 'Weapon', className: styles.slotWeapon },
+    { id: 'Helm', className: styles.slotHelm },
+    { id: 'Amulet', className: styles.slotAmulet },
+    { id: 'Offhand', className: styles.slotOffhand },
+    { id: 'Gloves', className: styles.slotGloves },
+    { id: 'BodyArmour', className: styles.slotBodyArmour },
+    { id: 'Ring', className: styles.slotRing },
+    { id: 'Boots', className: styles.slotBoots },
+    { id: 'Ring2', className: styles.slotRing2 },
+    { id: 'Belt', className: styles.slotBelt },
+    { id: 'Flask', className: styles.slotFlask },
+    { id: 'Flask2', className: styles.slotFlask2 },
+    { id: 'Flask3', className: styles.slotFlask3 },
+    { id: 'Flask4', className:styles.slotFlask4 },
+    { id: 'Flask5', className: styles.slotFlask5 },
   ];
 
-  // Handle login status change
-  const handleLoginStatusChange = (isLoggedIn: boolean) => {
-    setIsAuthenticated(isLoggedIn);
-    
-    // Clear any previous rate limit warnings when authentication status changes
-    if (isLoggedIn) {
-      setShowRateLimitWarning(false);
-    }
-  };
-
-  // Handle API errors, especially rate limiting
-  const handleApiError = (error: any) => {
-    setIsLoading(false);
-    
-    if (error.response) {
-      const status = error.response.status;
-      const data = error.response.data;
-      
-      if (status === 429) {
-        // Rate limit error
-        setError(`Rate limited by Path of Exile API. Please try again later or log in with your PoE account for higher rate limits.`);
-        setShowRateLimitWarning(true);
-      } else if (status === 401) {
-        // Authentication error
-        setError('Authentication failed. Please log in again.');
-        setIsAuthenticated(false);
-      } else if (status === 404) {
-        setError('Account not found. Please check the account name and try again.');
-      } else {
-        setError(data.error || 'An error occurred while fetching data');
-      }
-    } else {
-      setError('An error occurred while fetching data');
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-[#0c0c0e] text-white">
+    <div 
+      className="min-h-screen bg-[#0c0c0e] text-white"
+      onWheel={tooltipItem && tooltipVisible ? handleTooltipScroll : undefined}
+    >
       <Navbar />
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-[#af6025] mb-6">Path of Exile Armory</h1>
-        
-        <div className="bg-[#1a1a1a] border border-[#3d3d3d] rounded-lg p-6 mb-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-            <div className="flex-1 mb-4 md:mb-0">
-              <h2 className="text-xl font-semibold text-[#a38d6d] mb-2">Character Search</h2>
-              <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    id="accountName"
-                    value={accountName}
-                    onChange={(e) => setAccountName(e.target.value)}
-                    placeholder="Enter PoE Account Name"
-                    className="w-full px-4 py-2 bg-[#2a2a2a] border border-[#3d3d3d] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[#af6025]"
-                    required
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isLoading || !accountName.trim()}
-                  className={`px-6 py-2 rounded-md font-medium ${
-                    isLoading || !accountName.trim()
-                      ? 'bg-[#3d3d3d] cursor-not-allowed'
-                      : 'bg-[#af6025] hover:bg-[#c27b3e] transition-colors duration-200'
-                  }`}
-                >
-                  {isLoading ? (
-                    <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
-                      Loading...
-                    </span>
-                  ) : (
-                    'Search'
-                  )}
-                </button>
-              </form>
-              <div className="mt-2 text-sm text-[#a38d6d]">
-                <p>Enter your Path of Exile account name. Make sure your profile is set to public in your privacy settings.</p>
-                <p>For Battle.net accounts, include the # and number (e.g., ExampleName#1234).</p>
-              </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="bg-[#1a1a1a] border border-[#3d3d3d] rounded-lg p-6 mb-6 shadow-lg">
+          <form onSubmit={handleSubmit} className="flex flex-wrap gap-4 items-end">
+            <div className="flex-1 min-w-[200px]">
+              <label htmlFor="accountName" className="block text-sm font-medium text-[#a38d6d] mb-2">
+                Account Name
+              </label>
+              <input
+                id="accountName"
+                type="text"
+                value={accountName}
+                onChange={(e) => setAccountName(e.target.value)}
+                placeholder="Enter PoE account name"
+                className="w-full px-4 py-2 bg-[#252525] border border-[#3d3d3d] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[#af6025]"
+                required
+              />
             </div>
-          </div>
-          
-          {showRateLimitWarning && !isAuthenticated && (
-            <div className="bg-[#3a2a1a] border border-[#af6025] rounded-lg p-4 mb-4">
-              <p className="text-[#f0c78a] flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                You are experiencing rate limiting from the Path of Exile API. Log in with your PoE account for higher rate limits.
-              </p>
-            </div>
-          )}
-          
-          {error && (
-            <div className="mt-4 p-3 bg-red-900/50 border border-red-700 rounded-md text-red-200">
-              <p className="font-medium">Error: {error}</p>
-            </div>
-          )}
-          
-          {isAuthenticated && (
-            <div className="bg-[#2a3a2a] border border-[#4a5a4a] rounded-lg p-4 mb-4">
-              <p className="text-green-400 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                You are authenticated with Path of Exile. You now have higher rate limits for API requests.
-              </p>
-            </div>
-          )}
+            <button 
+              type="submit" 
+              className="px-6 py-2 bg-[#af6025] text-white font-medium rounded-md hover:bg-[#c27b3e] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || !accountName.trim()}
+            >
+              {isLoading ? 'Loading...' : 'Search'}
+            </button>
+          </form>
+        </div>
 
-          {isLoading ? (
-            <div className="flex justify-center items-center h-64 bg-[#1a1a1a] border border-[#3d3d3d] rounded-lg">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#af6025]"></div>
-            </div>
-          ) : error ? (
-            <div className="bg-[#1a1a1a] border border-[#3d3d3d] rounded-lg p-4 shadow-lg">
-              <div className="text-red-500">{error}</div>
-            </div>
-          ) : characters.length > 0 ? (
+        {error && (
+          <div className="bg-[#3d1c1c] border border-[#b41e1e] text-white p-4 rounded-md mb-6">
+            <p className="font-medium">{error}</p>
+            {error.includes('private') && (
+              <p className="mt-2 text-sm">
+                Make sure your profile is set to public in your 
+                <a href="https://www.pathofexile.com/my-account/privacy" target="_blank" rel="noopener noreferrer" className="text-[#ffcc00] hover:underline ml-1">
+                  Path of Exile privacy settings
+                </a>.
+              </p>
+            )}
+          </div>
+        )}
+
+        {characters.length > 0 && (
+          <div className="mb-6">
             <div className="bg-[#1a1a1a] border border-[#3d3d3d] rounded-lg p-4 shadow-lg">
               <h3 className="text-lg font-medium text-[#af6025] mb-4">Characters</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -605,22 +548,24 @@ export default function ArmoryPage() {
                   </div>
                 ))}
               </div>
-              
-              {/* Character data display */}
-              {isLoadingCharacter ? (
-                <div className="mt-6 border-t border-[#3d3d3d] pt-6 flex justify-center items-center h-64">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#af6025]"></div>
-                </div>
-              ) : characterData ? (
-                <div className="mt-6 border-t border-[#3d3d3d] pt-6">
+            </div>
+          </div>
+        )}
+
+        {characters.length > 0 && (
+          <div>
+            {characterData ? (
+              <div className="bg-[#1a1a1a] border border-[#3d3d3d] rounded-lg p-4 shadow-lg">
+                <div className="mb-6 border-b border-[#3d3d3d] pb-4">
                   <h2 className="text-xl font-bold text-[#af6025]">{characterData.character.name}</h2>
-                  <div className="mt-2 mb-4">
+                  <div className="mt-2">
                     <p className="text-[#a38d6d]">Level {characterData.character.level} {characterData.character.class}</p>
                     <p className="text-[#a38d6d]">{characterData.character.league} League</p>
                   </div>
-                  
-                  {/* Equipment display */}
-                  <div className="flex justify-center mt-6">
+                </div>
+
+                {characterData.items.length > 0 ? (
+                  <div className="flex justify-center items-center">
                     <div className={styles.equipmentGrid}>
                       {equipmentSlots.map(slot => (
                         <div key={slot.id} className={`${styles.equipmentSlot} ${slot.className}`}>
@@ -628,50 +573,61 @@ export default function ArmoryPage() {
                         </div>
                       ))}
                     </div>
+                    
+                    {/* Item tooltip */}
+                    {tooltipItem && (
+                      <div 
+                        ref={tooltipRef}
+                        className={`${styles.itemTooltip} ${styles.itemTooltipVisible}`} 
+                        style={{ 
+                          left: `${tooltipPosition.x}px`, 
+                          top: `${tooltipPosition.y}px` 
+                        }}
+                      >
+                        <div className={`${styles.tooltipHeader} ${styles[mapFrameTypeToRarity(tooltipItem.frameType)]}`}>
+                          <div className={styles.tooltipName}>{tooltipItem.name || tooltipItem.typeLine}</div>
+                          {tooltipItem.name && <div className={styles.tooltipType}>{tooltipItem.typeLine}</div>}
+                        </div>
+                        
+                        <div className={styles.tooltipSection}>
+                          {renderItemProperties(tooltipItem)}
+                        </div>
+                        
+                        <div className={styles.tooltipSection}>
+                          {renderItemRequirements(tooltipItem)}
+                        </div>
+                        
+                        <div className={styles.tooltipSection}>
+                          {renderItemMods(tooltipItem)}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ) : selectedCharacter ? (
-                <div className="mt-6 border-t border-[#3d3d3d] pt-6 text-center">
-                  <p className="text-[#a38d6d] mt-4">Select a character to view their equipment</p>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div className="flex justify-center items-center h-64 bg-[#1a1a1a] border border-[#3d3d3d] rounded-lg">
-              <p className="text-[#a38d6d]">Enter an account name and click Search to view characters</p>
-            </div>
-          )}
-        </div>
+                ) : (
+                  <div className="p-6 text-center">
+                    <p className="text-[#a38d6d] mb-2">No equipment data available for this character.</p>
+                    <p className="text-sm text-[#777]">This could be due to API limitations or the character being inactive.</p>
+                    <button 
+                      onClick={() => handleCharacterSelect(selectedCharacter!)}
+                      className="mt-4 px-4 py-2 bg-[#af6025] text-white rounded-md hover:bg-[#c27b3e] transition-colors duration-200"
+                    >
+                      Retry Loading Equipment
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : selectedCharacter ? (
+              <div className="flex justify-center items-center h-64 bg-[#1a1a1a] border border-[#3d3d3d] rounded-lg">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#af6025]"></div>
+              </div>
+            ) : (
+              <div className="flex justify-center items-center h-64 bg-[#1a1a1a] border border-[#3d3d3d] rounded-lg">
+                <p className="text-[#a38d6d]">Select a character to view their equipment</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      
-      {/* Item tooltip */}
-      {tooltipItem && (
-        <div 
-          ref={tooltipRef}
-          className={`${styles.itemTooltip} ${styles.itemTooltipVisible}`} 
-          style={{ 
-            left: `${tooltipPosition.x}px`, 
-            top: `${tooltipPosition.y}px` 
-          }}
-        >
-          <div className={`${styles.tooltipHeader} ${styles[mapFrameTypeToRarity(tooltipItem.frameType)]}`}>
-            <div className={styles.tooltipName}>{tooltipItem.name || tooltipItem.typeLine}</div>
-            {tooltipItem.name && <div className={styles.tooltipType}>{tooltipItem.typeLine}</div>}
-          </div>
-          
-          <div className={styles.tooltipSection}>
-            {renderItemProperties(tooltipItem)}
-          </div>
-          
-          <div className={styles.tooltipSection}>
-            {renderItemRequirements(tooltipItem)}
-          </div>
-          
-          <div className={styles.tooltipSection}>
-            {renderItemMods(tooltipItem)}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

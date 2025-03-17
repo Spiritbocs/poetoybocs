@@ -1,0 +1,442 @@
+.armoryContainer {
+  min-height: 100vh;
+  color: white;
+  padding: 1rem;
+  font-family: inherit;
+}
+
+.searchForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  background-color: rgba(30, 30, 30, 0.8);
+  padding: 1rem;
+  border-radius: 0.25rem;
+  border: 1px solid #444;
+  margin-bottom: 1.5rem;
+}
+
+.formGroup {
+  flex: 1;
+  min-width: 200px;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.formGroup input {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #222;
+  border: 1px solid #444;
+  border-radius: 0.25rem;
+  color: white;
+}
+
+.searchButton {
+  padding: 0.75rem 1.5rem;
+  background-color: #5a3b23;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-weight: 600;
+  align-self: flex-end;
+}
+
+.searchButton:hover {
+  background-color: #7d5230;
+}
+
+.searchButton:disabled {
+  background-color: #3a2a1a;
+  cursor: not-allowed;
+}
+
+.error {
+  background-color: rgba(180, 30, 30, 0.3);
+  border: 1px solid #b41e1e;
+  padding: 1rem;
+  border-radius: 0.25rem;
+  margin: 1rem 0;
+}
+
+.error a {
+  color: #ffcc00;
+  text-decoration: underline;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.armoryContent {
+  display: grid;
+  grid-template-columns: 1fr 3fr;
+  gap: 2rem;
+}
+
+.characterList {
+  background-color: rgba(30, 30, 30, 0.8);
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #444;
+}
+
+.characterList h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: #d4af37;
+}
+
+.characterList ul {
+  list-style: none;
+  padding: 0;
+}
+
+.characterList li {
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.characterList li:hover {
+  background-color: rgba(60, 60, 60, 0.8);
+}
+
+.selectedCharacter {
+  background-color: rgba(90, 59, 35, 0.8) !important;
+  border-left: 3px solid #d4af37;
+}
+
+.characterListItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.characterName {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.characterDetails {
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.characterHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  background-color: rgba(30, 30, 30, 0.8);
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #444;
+}
+
+.characterHeader h2 {
+  font-size: 1.8rem;
+  color: #d4af37;
+  margin: 0;
+}
+
+.characterInfo {
+  text-align: right;
+}
+
+.characterInfo p {
+  margin: 0.25rem 0;
+  color: #ccc;
+}
+
+.inventoryContainer {
+  background-color: rgba(30, 30, 30, 0.8);
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #444;
+}
+
+.equipmentGrid {
+  position: relative;
+  width: 100%;
+  max-width: 650px;
+  height: 650px;
+  margin: 0 auto;
+  background-image: url('/images/inventory/MainInventoryNoBags.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 2px solid #3a3a3a;
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
+}
+
+.equipmentSlot {
+  position: absolute;
+  background-color: transparent;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+/* Weapon slots */
+.slotWeapon {
+  left: 6%;
+  top: 21%;
+  width: 17%;
+  height: 36%;
+}
+
+.slotOffhand {
+  right: 6%;
+  top: 21%;
+  width: 17%;
+  height: 36%;
+}
+
+/* Armor slots */
+.slotHelm {
+  left: 50%;
+  top: 19%;
+  transform: translateX(-50%);
+  width: 18%;
+  height: 17%;
+}
+
+.slotBodyArmour {
+  left: 50%;
+  top: 39%;
+  transform: translateX(-50%);
+  width: 18%;
+  height: 27%;
+}
+
+.slotGloves {
+  left: 19.5%;
+  top: 60%;
+  width: 16%;
+  height: 17%;
+}
+
+.slotBoots {
+  right: 20%;
+  top: 60%;
+  width: 16%;
+  height: 17%;
+}
+
+/* Jewelry slots */
+.slotAmulet {
+  left: 63%;
+  /* transform: translateX(-50%); */
+  top: 37%;
+  width: 9%;
+  height: 9%;
+}
+
+.slotRing {
+  left: 28%;
+  top: 48%;
+  width: 9%;
+  height: 9%;
+}
+
+.slotRing2 {
+  right: 28%;
+  top: 48%;
+  width: 9%;
+  height: 9%;
+}
+
+.slotBelt {
+  left: 50%;
+  transform: translateX(-50%);
+  top: 69%;
+  width: 18%;
+  height: 8%;
+}
+
+/* Flask slots */
+.slotFlask {
+  left: 28.5%;
+  bottom: 2.5%;
+  width: 8%;
+  height: 17.5%;
+}
+
+.slotFlask2 {
+  left: 37.5%;
+  bottom: 2.5%;
+  width: 8%;
+  height: 17.5%;
+}
+
+.slotFlask3 {
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 2.5%;
+  width: 8%;
+  height: 17.5%;
+}
+
+.slotFlask4 {
+  right: 36.5%;
+  bottom: 2.5%;
+  width: 8%;
+  height: 17.5%;
+}
+
+.slotFlask5 {
+  right: 27%;
+  bottom: 2.5%;
+  width: 8%;
+  height: 17.5%;
+}
+
+.slotName {
+  display: none;
+}
+
+.item {
+  background-color: rgba(0, 0, 0, 0.5);
+  border: 1px solid #3a3a3a;
+  border-radius: 0;
+  overflow: hidden;
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+.itemHeader {
+  display: none;
+}
+
+.itemContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  padding: 2px;
+}
+
+.itemImage {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background-color: rgba(0, 0, 50, 0.7);
+}
+
+.itemImage img {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.3));
+}
+
+.emptySlot {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 50, 0.3);
+  border: 1px solid #3a3a3a;
+}
+
+.inventoryTitle {
+  display: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .equipmentGrid {
+    max-width: 100%;
+    padding: 60px 15px 15px 15px;
+  }
+}
+
+/* Rarity colors */
+.normal {
+  color: #c8c8c8;
+}
+
+.magic {
+  color: #8888ff;
+}
+
+.rare {
+  color: #ffff77;
+}
+
+.unique {
+  color: #af6025;
+}
+
+.gem {
+  color: #1ba29b;
+}
+
+.currency {
+  color: #aa9e82;
+}
+
+.divination {
+  color: #0ebaff;
+}
+
+.quest {
+  color: #4ae63a;
+}
+
+.prophecy {
+  color: #b54bff;
+}
+
+.relic {
+  color: #82ad6a;
+}
+
+/* Custom scrollbar styling */
+.characterScroller {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #af6025 #252525;
+}
+
+.characterScroller::-webkit-scrollbar {
+  height: 8px;
+}
+
+.characterScroller::-webkit-scrollbar-track {
+  background: #252525;
+  border-radius: 10px;
+}
+
+.characterScroller::-webkit-scrollbar-thumb {
+  background-color: #af6025;
+  border-radius: 10px;
+  border: 2px solid #252525;
+}
+
+.characterScroller::-webkit-scrollbar-thumb:hover {
+  background-color: #c27b3e;
+}

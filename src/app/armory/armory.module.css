@@ -116,18 +116,6 @@
   border-radius: 4px;
 }
 
-.characterListVertical ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.contentContainer {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
 .characterList {
   width: 250px;
   background-color: #1a1a1a;
@@ -540,14 +528,16 @@
 /* Tooltip styles */
 .itemTooltip {
   position: fixed;
-  z-index: 100;
-  width: 300px;
-  background-color: rgba(0, 0, 0, 0.95);
-  color: #fff;
-  border: 1px solid #3a3a3a;
+  z-index: 1000;
+  background-color: rgba(0, 0, 0, 0.9);
+  border: 1px solid #444;
   border-radius: 4px;
   padding: 10px;
+  width: 300px;
+  max-height: 80vh;
+  overflow-y: auto;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
+  font-size: 14px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -585,13 +575,12 @@
 .tooltipHeader {
   margin-bottom: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid #444;
 }
 
 .tooltipName {
-  font-size: 16px;
   font-weight: bold;
-  margin-bottom: 4px;
+  font-size: 16px;
 }
 
 .tooltipType {
@@ -602,16 +591,17 @@
 .tooltipSection {
   margin-bottom: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid #333;
 }
 
 .tooltipSection:last-child {
+  border-bottom: none;
   margin-bottom: 0;
   padding-bottom: 0;
-  border-bottom: none;
 }
 
-.tooltipProperties {
+.tooltipProperty {
+  margin-bottom: 2px;
   color: #8888ff;
 }
 
@@ -705,6 +695,27 @@
 
 .characterScroller::-webkit-scrollbar-thumb:hover {
   background-color: #c27b3e;
+}
+
+/* Character Avatar */
+.characterAvatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  border: 2px solid #af6025;
+  background-color: #1c1c1c;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(175, 96, 37, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.characterAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 /* Responsive adjustments */
@@ -866,7 +877,7 @@
 .tooltipSection {
   margin-bottom: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #3d3d3d;
+  border-bottom: 1px solid #333;
 }
 
 .tooltipSection:last-child {
@@ -895,4 +906,551 @@
 
 .tooltipExplicitMods {
   color: #8cf;
+}
+
+.tooltipCraftedMods {
+  color: #b4c2ff;
+}
+
+.tooltipEnchantMods {
+  color: #b4a0ff;
+}
+
+.tooltipCorrupted {
+  color: #ff6666;
+  margin-top: 8px;
+}
+
+.characterListSidebar {
+  background-color: #1a1a1a;
+  border: 1px solid #3d3d3d;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  height: fit-content;
+  max-height: 600px;
+}
+
+.characterListVertical {
+  max-height: 500px;
+  overflow-y: auto;
+  /* Custom scrollbar for webkit browsers */
+  scrollbar-width: thin;
+  scrollbar-color: #444 #222;
+}
+
+.characterListVertical::-webkit-scrollbar {
+  width: 8px;
+}
+
+.characterListVertical::-webkit-scrollbar-track {
+  background: #222;
+  border-radius: 4px;
+}
+
+.characterListVertical::-webkit-scrollbar-thumb {
+  background-color: #444;
+  border-radius: 4px;
+}
+
+.characterItem {
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  background-color: #2a2a2a;
+  border: 1px solid #3d3d3d;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.characterItem:hover {
+  background-color: #333;
+  border-color: #555;
+}
+
+.characterItem.selected {
+  background-color: #5a3b23;
+  border-color: #7d5230;
+}
+
+.characterName {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.characterInfo {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+.characterClass {
+  color: #ffcc00;
+}
+
+.characterLevel {
+  color: #8fbcbb;
+}
+
+.characterLeague {
+  color: #b48ead;
+}
+
+.characterDetails {
+  flex: 1;
+  background-color: #1a1a1a;
+  border: 1px solid #3d3d3d;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  min-height: 600px;
+}
+
+.characterHeader {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.characterAvatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #2a2a2a;
+  margin-right: 1.5rem;
+  border: 2px solid #5a3b23;
+}
+
+.characterNameHeader {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.characterMetaInfo {
+  display: flex;
+  gap: 1rem;
+  color: #aaa;
+}
+
+.characterMetaInfo span {
+  display: flex;
+  align-items: center;
+}
+
+.characterMetaInfo span:before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+}
+
+.characterMetaInfo .level:before {
+  background-color: #8fbcbb;
+}
+
+.characterMetaInfo .class:before {
+  background-color: #ffcc00;
+}
+
+.characterMetaInfo .league:before {
+  background-color: #b48ead;
+}
+
+.characterStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.statItem {
+  background-color: #2a2a2a;
+  border: 1px solid #3d3d3d;
+  border-radius: 0.25rem;
+  padding: 0.75rem;
+}
+
+.statLabel {
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-bottom: 0.25rem;
+}
+
+.statValue {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.equipmentSection {
+  margin-bottom: 2rem;
+}
+
+.sectionTitle {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #ffcc00;
+}
+
+.equipmentGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(4, auto);
+  gap: 1rem;
+}
+
+.equipmentSlot {
+  background-color: #2a2a2a;
+  border: 1px solid #3d3d3d;
+  border-radius: 0.25rem;
+  padding: 0.75rem;
+  position: relative;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+}
+
+.slotName {
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-bottom: 0.5rem;
+}
+
+.itemName {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.itemProps {
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+.emptySlot {
+  color: #666;
+  font-style: italic;
+}
+
+/* Equipment slot positioning */
+.Helmet {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.BodyArmour {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.Gloves {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.Boots {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.Belt {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.Ring {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+.Ring2 {
+  grid-column: 3;
+  grid-row: 3;
+}
+
+.Amulet {
+  grid-column: 2;
+  grid-row: 4;
+}
+
+.Weapon {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.Offhand {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.Flask {
+  grid-column: 1;
+  grid-row: 4;
+}
+
+.Flask2 {
+  grid-column: 3;
+  grid-row: 4;
+}
+
+/* Item rarity colors */
+.normal {
+  color: #c8c8c8;
+}
+
+.magic {
+  color: #8888ff;
+}
+
+.rare {
+  color: #ffff77;
+}
+
+.unique {
+  color: #af6025;
+}
+
+.gem {
+  color: #1ba29b;
+}
+
+.currency {
+  color: #aa9e82;
+}
+
+.divination {
+  color: #0ebaff;
+}
+
+.questItem {
+  color: #4ae63a;
+}
+
+.prophecy {
+  color: #b54bff;
+}
+
+.relic {
+  color: #82ad6a;
+}
+
+/* Tooltip styles */
+.tooltip {
+  position: absolute;
+  z-index: 1000;
+  background-color: #1a1a1a;
+  border: 1px solid #3d3d3d;
+  border-radius: 0.25rem;
+  padding: 1rem;
+  min-width: 300px;
+  max-width: 400px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.tooltip.visible {
+  opacity: 1;
+}
+
+.tooltipHeader {
+  margin-bottom: 0.5rem;
+}
+
+.tooltipItemName {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.tooltipItemType {
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+.tooltipDivider {
+  height: 1px;
+  background-color: #3d3d3d;
+  margin: 0.5rem 0;
+}
+
+.tooltipProperty {
+  margin-bottom: 0.25rem;
+}
+
+.tooltipPropertyLabel {
+  color: #aaa;
+}
+
+.tooltipPropertyValue {
+  float: right;
+}
+
+.tooltipMods {
+  margin: 0.5rem 0;
+}
+
+.tooltipMod {
+  margin-bottom: 0.25rem;
+  color: #8fbcbb;
+}
+
+.tooltipRequirements {
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-top: 0.5rem;
+}
+
+.tooltipRequirement {
+  display: inline-block;
+  margin-right: 1rem;
+}
+
+.tooltipRequirementValue {
+  color: white;
+}
+
+.tooltipSockets {
+  display: flex;
+  margin: 0.5rem 0;
+}
+
+.tooltipSocket {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  margin-right: 0.25rem;
+  border: 1px solid #3d3d3d;
+}
+
+.tooltipSocketR {
+  background-color: #ff4444;
+}
+
+.tooltipSocketG {
+  background-color: #44ff44;
+}
+
+.tooltipSocketB {
+  background-color: #4444ff;
+}
+
+.tooltipSocketW {
+  background-color: #ffffff;
+}
+
+.tooltipSocketA {
+  background-color: #aa9e82;
+}
+
+.tooltipLink {
+  width: 10px;
+  height: 2px;
+  background-color: #3d3d3d;
+  align-self: center;
+  margin: 0 -2px;
+}
+
+.tooltipLink.linked {
+  background-color: #aaa;
+}
+
+.tooltipItemLevel {
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-top: 0.5rem;
+}
+
+.wikiLink {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  background-color: #3d3d3d;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: white;
+  text-decoration: none;
+}
+
+.wikiLink:hover {
+  background-color: #5a3b23;
+}
+
+.passiveTreeSection {
+  margin-top: 2rem;
+}
+
+.passiveTreeContainer {
+  background-color: #2a2a2a;
+  border: 1px solid #3d3d3d;
+  border-radius: 0.25rem;
+  padding: 1rem;
+  min-height: 400px;
+  position: relative;
+}
+
+.passiveTreePlaceholder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400px;
+  color: #aaa;
+  font-style: italic;
+}
+
+.passiveTreeLoading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+}
+
+.tooltipFooter {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #3d3d3d;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+.characterInventoryLayout {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 4px;
+  background-image: url('/images/inventory/armour_layout.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  width: 100%;
+  height: 400px;
+  margin-top: 2rem;
+  position: relative;
+}
+
+.inventorySlot {
+  position: relative;
+  border: 1px solid transparent;
+}
+
+.inventorySlot:hover {
+  border-color: #ffcc00;
 }
