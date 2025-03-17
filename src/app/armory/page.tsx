@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import styles from './armory.module.css';
 import Navbar from '@/components/Navbar';
 
@@ -96,6 +96,9 @@ export default function ArmoryPage() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<string | null>(null);
   const [characterData, setCharacterData] = useState<CharacterData | null>(null);
+  const [tooltipItem, setTooltipItem] = useState<Item | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,7 +111,7 @@ export default function ArmoryPage() {
     setCharacterData(null);
 
     try {
-      const response = await fetch(`/api/armory?account=${encodeURIComponent(accountName)}`);
+      const response = await fetch(`/api/armory?accountName=${encodeURIComponent(accountName)}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -180,7 +183,7 @@ export default function ArmoryPage() {
     if (!item.properties || item.properties.length === 0) return null;
 
     return (
-      <div className={styles.itemProperties}>
+      <div className={styles.tooltipProperties}>
         {item.properties.map((prop, index) => (
           <div key={index}>
             {prop.name}: {prop.values.map(([value]) => value).join(', ')}
@@ -194,10 +197,11 @@ export default function ArmoryPage() {
     if (!item.requirements || item.requirements.length === 0) return null;
 
     return (
-      <div className={styles.itemRequirements}>
-        <span className={styles.requirementsHeader}>Requires:</span>
+      <div className={styles.tooltipRequirements}>
+        <span>Requires: </span>
         {item.requirements.map((req, index) => (
-          <span key={index} className={styles.requirement}>
+          <span key={index}>
+            {index > 0 && ', '}
             {req.name} {req.values.map(([value]) => value).join(', ')}
           </span>
         ))}
@@ -206,32 +210,96 @@ export default function ArmoryPage() {
   };
 
   const renderItemMods = (item: Item) => {
-    const allMods = [
-      ...(item.implicitMods || []),
-      ...(item.explicitMods || []),
-      ...(item.craftedMods || []),
-      ...(item.enchantMods || []),
-    ];
-
-    if (allMods.length === 0) return null;
-
     return (
-      <div className={styles.itemMods}>
-        {allMods.map((mod, index) => (
-          <div key={index} className={styles.itemMod}>
-            {mod}
+      <>
+        {item.implicitMods && item.implicitMods.length > 0 && (
+          <div className={styles.tooltipImplicitMods}>
+            {item.implicitMods.map((mod, index) => (
+              <div key={`implicit-${index}`}>{mod}</div>
+            ))}
           </div>
-        ))}
-        {item.corrupted && <div className={styles.corrupted}>Corrupted</div>}
-      </div>
+        )}
+        
+        {item.explicitMods && item.explicitMods.length > 0 && (
+          <div className={styles.tooltipExplicitMods}>
+            {item.explicitMods.map((mod, index) => (
+              <div key={`explicit-${index}`}>{mod}</div>
+            ))}
+          </div>
+        )}
+        
+        {item.craftedMods && item.craftedMods.length > 0 && (
+          <div className={styles.tooltipCraftedMods}>
+            {item.craftedMods.map((mod, index) => (
+              <div key={`crafted-${index}`}>{mod}</div>
+            ))}
+          </div>
+        )}
+        
+        {item.enchantMods && item.enchantMods.length > 0 && (
+          <div className={styles.tooltipEnchantMods}>
+            {item.enchantMods.map((mod, index) => (
+              <div key={`enchant-${index}`}>{mod}</div>
+            ))}
+          </div>
+        )}
+        
+        {item.corrupted && (
+          <div className={styles.tooltipCorrupted}>Corrupted</div>
+        )}
+      </>
     );
+  };
+
+  const handleItemMouseEnter = (e: React.MouseEvent, item: Item) => {
+    setTooltipItem(item);
+    updateTooltipPosition(e);
+  };
+
+  const handleItemMouseLeave = () => {
+    setTooltipItem(null);
+  };
+
+  const handleItemMouseMove = (e: React.MouseEvent) => {
+    if (tooltipItem) {
+      updateTooltipPosition(e);
+    }
+  };
+
+  const updateTooltipPosition = (e: React.MouseEvent) => {
+    const tooltipWidth = 300; // Match this with the CSS width
+    const tooltipHeight = tooltipRef.current?.offsetHeight || 400;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Calculate position to keep tooltip within viewport
+    let x = e.clientX + 15;
+    let y = e.clientY + 15;
+    
+    // Adjust horizontal position if tooltip would go off-screen
+    if (x + tooltipWidth > viewportWidth) {
+      x = e.clientX - tooltipWidth - 15;
+    }
+    
+    // Adjust vertical position if tooltip would go off-screen
+    if (y + tooltipHeight > viewportHeight) {
+      y = viewportHeight - tooltipHeight - 15;
+      if (y < 0) y = 15; // If tooltip is taller than viewport, align to top
+    }
+    
+    setTooltipPosition({ x, y });
   };
 
   const renderItem = (item: Item) => {
     const rarityClass = mapFrameTypeToRarity(item.frameType);
     
     return (
-      <div className={styles.item}>
+      <div 
+        className={styles.item}
+        onMouseEnter={(e) => handleItemMouseEnter(e, item)}
+        onMouseLeave={handleItemMouseLeave}
+        onMouseMove={handleItemMouseMove}
+      >
         <div className={`${styles.itemHeader} ${styles[rarityClass]}`}>
           <div className={styles.itemName}>
             <span className={styles.itemNameText}>{item.name || item.typeLine}</span>
@@ -244,8 +312,6 @@ export default function ArmoryPage() {
               <img 
                 src={item.icon} 
                 alt={item.name || item.typeLine} 
-                width={64} 
-                height={64}
                 onError={(e) => {
                   // If image fails to load, replace with a placeholder
                   (e.target as HTMLImageElement).src = "https://web.poecdn.com/image/Art/2DItems/Currency/CurrencyRerollRare.png";
@@ -256,11 +322,6 @@ export default function ArmoryPage() {
               <div className={styles.noImage}>No Image</div>
             )}
           </div>
-          <div className={styles.itemDetails}>
-            {renderItemProperties(item)}
-            {renderItemRequirements(item)}
-            {renderItemMods(item)}
-          </div>
         </div>
       </div>
     );
@@ -270,20 +331,27 @@ export default function ArmoryPage() {
     if (!characterData) return null;
 
     const item = characterData.items.find(item => item.inventoryId === slotId);
-    const slotName = getSlotName(slotId);
 
-    return (
-      <div className={styles.equipmentSlot}>
-        <div className={styles.slotName}>{slotName}</div>
-        {item ? renderItem(item) : <div className={styles.emptySlot}>Empty</div>}
-      </div>
-    );
+    return item ? renderItem(item) : <div className={styles.emptySlot}></div>;
   };
 
+  // Define slot mappings for the Path of Exile style layout
   const equipmentSlots = [
-    'Helm', 'Amulet', 'Weapon', 'BodyArmour', 'Offhand',
-    'Gloves', 'Ring', 'Belt', 'Ring2', 'Boots',
-    'Flask', 'Flask2', 'Flask3', 'Flask4', 'Flask5',
+    { id: 'Weapon', className: styles.slotWeapon },
+    { id: 'Helm', className: styles.slotHelm },
+    { id: 'Amulet', className: styles.slotAmulet },
+    { id: 'Offhand', className: styles.slotOffhand },
+    { id: 'Gloves', className: styles.slotGloves },
+    { id: 'BodyArmour', className: styles.slotBodyArmour },
+    { id: 'Ring', className: styles.slotRing },
+    { id: 'Boots', className: styles.slotBoots },
+    { id: 'Ring2', className: styles.slotRing2 },
+    { id: 'Belt', className: styles.slotBelt },
+    { id: 'Flask', className: styles.slotFlask },
+    { id: 'Flask2', className: styles.slotFlask2 },
+    { id: 'Flask3', className: styles.slotFlask3 },
+    { id: 'Flask4', className: styles.slotFlask4 },
+    { id: 'Flask5', className: styles.slotFlask5 },
   ];
 
   return (
@@ -372,26 +440,57 @@ export default function ArmoryPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {characterData.items.length > 0 ? (
-                    equipmentSlots.map(slot => (
-                      <div key={slot} className="bg-[#252525] border border-[#3d3d3d] rounded-lg overflow-hidden">
-                        {renderEquipmentSlot(slot)}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="col-span-3 p-6 text-center">
-                      <p className="text-[#a38d6d] mb-2">No equipment data available for this character.</p>
-                      <p className="text-sm text-[#777]">This could be due to API limitations or the character being inactive.</p>
-                      <button 
-                        onClick={() => handleCharacterSelect(selectedCharacter!)}
-                        className="mt-4 px-4 py-2 bg-[#af6025] text-white rounded-md hover:bg-[#c27b3e] transition-colors duration-200"
-                      >
-                        Retry Loading Equipment
-                      </button>
+                {characterData.items.length > 0 ? (
+                  <div className="flex justify-center items-center">
+                    <div className={styles.equipmentGrid}>
+                      {equipmentSlots.map(slot => (
+                        <div key={slot.id} className={`${styles.equipmentSlot} ${slot.className}`}>
+                          {renderEquipmentSlot(slot.id)}
+                        </div>
+                      ))}
                     </div>
-                  )}
-                </div>
+                    
+                    {/* Item tooltip */}
+                    {tooltipItem && (
+                      <div 
+                        ref={tooltipRef}
+                        className={`${styles.itemTooltip} ${styles.itemTooltipVisible}`} 
+                        style={{ 
+                          left: `${tooltipPosition.x}px`, 
+                          top: `${tooltipPosition.y}px` 
+                        }}
+                      >
+                        <div className={`${styles.tooltipHeader} ${styles[mapFrameTypeToRarity(tooltipItem.frameType)]}`}>
+                          <div className={styles.tooltipName}>{tooltipItem.name || tooltipItem.typeLine}</div>
+                          {tooltipItem.name && <div className={styles.tooltipType}>{tooltipItem.typeLine}</div>}
+                        </div>
+                        
+                        <div className={styles.tooltipSection}>
+                          {renderItemProperties(tooltipItem)}
+                        </div>
+                        
+                        <div className={styles.tooltipSection}>
+                          {renderItemRequirements(tooltipItem)}
+                        </div>
+                        
+                        <div className={styles.tooltipSection}>
+                          {renderItemMods(tooltipItem)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center">
+                    <p className="text-[#a38d6d] mb-2">No equipment data available for this character.</p>
+                    <p className="text-sm text-[#777]">This could be due to API limitations or the character being inactive.</p>
+                    <button 
+                      onClick={() => handleCharacterSelect(selectedCharacter!)}
+                      className="mt-4 px-4 py-2 bg-[#af6025] text-white rounded-md hover:bg-[#c27b3e] transition-colors duration-200"
+                    >
+                      Retry Loading Equipment
+                    </button>
+                  </div>
+                )}
               </div>
             ) : selectedCharacter ? (
               <div className="flex justify-center items-center h-64 bg-[#1a1a1a] border border-[#3d3d3d] rounded-lg">

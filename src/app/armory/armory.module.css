@@ -166,128 +166,285 @@
 }
 
 .equipmentGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1rem;
+  position: relative;
+  width: 100%;
+  max-width: 650px;
+  height: 650px;
+  margin: 0 auto;
+  background-image: url('/images/inventory/MainInventoryNoBags.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 2px solid #3a3a3a;
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
 }
 
 .equipmentSlot {
-  background-color: rgba(20, 20, 20, 0.8);
-  padding: 1rem;
-  border-radius: 0.25rem;
-  border: 1px solid #333;
+  position: absolute;
+  background-color: transparent;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+/* Weapon slots */
+.slotWeapon {
+  left: 6%;
+  top: 21%;
+  width: 17%;
+  height: 36%;
+}
+
+.slotOffhand {
+  right: 6%;
+  top: 21%;
+  width: 17%;
+  height: 36%;
+}
+
+/* Armor slots */
+.slotHelm {
+  left: 50%;
+  top: 19%;
+  transform: translateX(-50%);
+  width: 18%;
+  height: 17%;
+}
+
+.slotBodyArmour {
+  left: 50%;
+  top: 39%;
+  transform: translateX(-50%);
+  width: 18%;
+  height: 27%;
+}
+
+.slotGloves {
+  left: 19.5%;
+  top: 60%;
+  width: 16%;
+  height: 17%;
+}
+
+.slotBoots {
+  right: 20%;
+  top: 60%;
+  width: 16%;
+  height: 17%;
+}
+
+/* Jewelry slots */
+.slotAmulet {
+  left: 63%;
+  /* transform: translateX(-50%); */
+  top: 37%;
+  width: 9%;
+  height: 9%;
+}
+
+.slotRing {
+  left: 28%;
+  top: 48%;
+  width: 9%;
+  height: 9%;
+}
+
+.slotRing2 {
+  right: 28%;
+  top: 48%;
+  width: 9%;
+  height: 9%;
+}
+
+.slotBelt {
+  left: 50%;
+  transform: translateX(-50%);
+  top: 69%;
+  width: 18%;
+  height: 8%;
+}
+
+/* Flask slots */
+.slotFlask {
+  left: 28.5%;
+  bottom: 2.5%;
+  width: 8%;
+  height: 17.5%;
+}
+
+.slotFlask2 {
+  left: 37.5%;
+  bottom: 2.5%;
+  width: 8%;
+  height: 17.5%;
+}
+
+.slotFlask3 {
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 2.5%;
+  width: 8%;
+  height: 17.5%;
+}
+
+.slotFlask4 {
+  right: 36.5%;
+  bottom: 2.5%;
+  width: 8%;
+  height: 17.5%;
+}
+
+.slotFlask5 {
+  right: 27%;
+  bottom: 2.5%;
+  width: 8%;
+  height: 17.5%;
 }
 
 .slotName {
-  font-weight: 500;
-  color: #a38d6d;
-  padding: 0.5rem;
-  background-color: #1a1a1a;
-  border-bottom: 1px solid #3d3d3d;
-}
-
-.emptySlot {
-  padding: 1rem;
-  text-align: center;
-  color: #666;
-  font-style: italic;
+  display: none;
 }
 
 .item {
-  background-color: #252525;
-  border: 1px solid #3d3d3d;
-  border-radius: 0.25rem;
+  background-color: rgba(0, 0, 0, 0.5);
+  border: 1px solid #3a3a3a;
+  border-radius: 0;
   overflow: hidden;
-  margin-bottom: 0.5rem;
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
 }
 
 .itemHeader {
-  padding: 0.5rem;
-  border-bottom: 1px solid #3d3d3d;
-}
-
-.itemName {
-  display: flex;
-  flex-direction: column;
-}
-
-.itemNameText {
-  font-weight: 600;
-}
-
-.itemType {
-  font-size: 0.8rem;
-  color: #a38d6d;
+  display: none;
 }
 
 .itemContent {
   display: flex;
-  padding: 0.5rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  padding: 2px;
 }
 
 .itemImage {
-  margin-right: 0.75rem;
-  flex-shrink: 0;
-  width: 64px;
-  height: 64px;
+  height: 100%;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  background-color: rgba(0, 0, 50, 0.7);
 }
 
-.noImage {
-  width: 64px;
-  height: 64px;
-  background-color: #333;
-  color: #666;
+.itemImage img {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.3));
+}
+
+.emptySlot {
+  height: 100%;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
-  border: 1px solid #444;
+  background-color: rgba(0, 0, 50, 0.3);
+  border: 1px solid #3a3a3a;
 }
 
-.itemDetails {
-  flex: 1;
-  font-size: 0.875rem;
+.inventoryTitle {
+  display: none;
 }
 
-.itemProperties, 
-.itemRequirements {
-  margin-bottom: 0.5rem;
-  color: #a38d6d;
+/* Tooltip styles */
+.itemTooltip {
+  position: fixed;
+  z-index: 100;
+  width: 300px;
+  background-color: rgba(0, 0, 0, 0.95);
+  color: #fff;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-size: 14px;
+  max-height: 500px;
+  overflow-y: auto;
 }
 
-.requirementsHeader {
-  margin-right: 0.25rem;
+.itemTooltipVisible {
+  opacity: 1;
 }
 
-.requirement {
-  margin-right: 0.5rem;
+.tooltipHeader {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #3a3a3a;
 }
 
-.itemMods {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+.tooltipName {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 4px;
 }
 
-.itemMod {
-  color: #6496ff;
+.tooltipType {
+  font-size: 14px;
+  color: #aaa;
 }
 
-.corrupted {
-  color: #d20000;
-  font-weight: 600;
-  margin-top: 0.25rem;
+.tooltipSection {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #3a3a3a;
 }
 
-.noItems {
-  background-color: rgba(30, 30, 30, 0.8);
-  padding: 2rem;
-  text-align: center;
-  border-radius: 0.5rem;
-  border: 1px solid #444;
+.tooltipSection:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.tooltipProperties {
+  color: #8888ff;
+}
+
+.tooltipRequirements {
+  color: #aaa;
+}
+
+.tooltipImplicitMods {
+  color: #7da5ff;
+}
+
+.tooltipExplicitMods {
+  color: #8888ff;
+}
+
+.tooltipCraftedMods {
+  color: #b4c2ff;
+}
+
+.tooltipEnchantMods {
+  color: #b4a0ff;
+}
+
+.tooltipCorrupted {
+  color: #ff6666;
+  margin-top: 8px;
 }
 
 /* Rarity colors */
@@ -331,17 +488,6 @@
   color: #82ad6a;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .armoryContent {
-    grid-template-columns: 1fr;
-  }
-  
-  .equipmentGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* Custom scrollbar styling */
 .characterScroller {
   overflow-x: auto;
@@ -366,4 +512,12 @@
 
 .characterScroller::-webkit-scrollbar-thumb:hover {
   background-color: #c27b3e;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .equipmentGrid {
+    max-width: 100%;
+    padding: 60px 15px 15px 15px;
+  }
 }
