@@ -82,54 +82,130 @@
   gap: 2rem;
 }
 
-.characterList {
-  background-color: rgba(30, 30, 30, 0.8);
-  padding: 1.5rem;
+.characterListSidebar {
+  width: 250px;
+  min-width: 250px;
+  background-color: #1a1a1a;
+  border: 1px solid #3d3d3d;
   border-radius: 0.5rem;
-  border: 1px solid #444;
+  padding: 1rem;
+  height: fit-content;
+  max-height: 600px;
+  margin-right: 1rem;
 }
 
-.characterList h2 {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  color: #d4af37;
+.characterListVertical {
+  max-height: 500px;
+  overflow-y: auto;
+  /* Custom scrollbar for webkit browsers */
+  scrollbar-width: thin;
+  scrollbar-color: #af6025 #2a2a2a;
 }
 
-.characterList ul {
+.characterListVertical::-webkit-scrollbar {
+  width: 8px;
+}
+
+.characterListVertical::-webkit-scrollbar-track {
+  background: #2a2a2a;
+  border-radius: 4px;
+}
+
+.characterListVertical::-webkit-scrollbar-thumb {
+  background-color: #af6025;
+  border-radius: 4px;
+}
+
+.characterListVertical ul {
   list-style: none;
   padding: 0;
+  margin: 0;
 }
 
-.characterList li {
+.contentContainer {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.characterList {
+  width: 250px;
+  background-color: #1a1a1a;
+  border: 1px solid #3d3d3d;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  height: fit-content;
+  max-height: 600px;
+}
+
+.characterListInner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.characterListScroll {
+  overflow-y: auto;
+  max-height: 500px;
+  /* Custom scrollbar for webkit browsers */
+  scrollbar-width: thin;
+  scrollbar-color: #af6025 #2a2a2a;
+}
+
+.characterListScroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.characterListScroll::-webkit-scrollbar-track {
+  background: #2a2a2a;
+  border-radius: 4px;
+}
+
+.characterListScroll::-webkit-scrollbar-thumb {
+  background-color: #af6025;
+  border-radius: 4px;
+}
+
+.characterItem {
   padding: 0.75rem;
-  margin-bottom: 0.5rem;
   border-radius: 0.25rem;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  margin-bottom: 0.5rem;
+  background-color: #252525;
 }
 
-.characterList li:hover {
-  background-color: rgba(60, 60, 60, 0.8);
+.characterItem:hover {
+  background-color: #2a2a2a;
+  border-color: #3d3d3d;
 }
 
 .selectedCharacter {
-  background-color: rgba(90, 59, 35, 0.8) !important;
-  border-left: 3px solid #d4af37;
+  background-color: #2a2a2a;
+  border-left: 4px solid #af6025;
 }
 
-.characterListItem {
+.characterInfo {
   display: flex;
   flex-direction: column;
 }
 
 .characterName {
   font-weight: 600;
-  font-size: 1.1rem;
+  color: #af6025;
+  margin-bottom: 0.25rem;
 }
 
 .characterDetails {
-  font-size: 0.9rem;
-  color: #aaa;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.875rem;
+  color: #a38d6d;
+}
+
+.characterClass {
+  margin-right: 0.5rem;
 }
 
 .characterHeader {
@@ -180,11 +256,106 @@
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
 }
 
+.equipmentGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 80px);
+  grid-template-rows: repeat(5, 80px);
+  gap: 8px;
+  position: relative;
+  margin: 0 auto;
+}
+
 .equipmentSlot {
   position: absolute;
   background-color: transparent;
   overflow: hidden;
   transition: all 0.2s ease;
+}
+
+.equipmentSlot {
+  width: 80px;
+  height: 80px;
+  background-color: rgba(20, 20, 20, 0.5);
+  border-radius: 4px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Specific slot positions */
+.Weapon {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.Offhand {
+  grid-column: 4;
+  grid-row: 1;
+}
+
+.Helmet {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.BodyArmour {
+  grid-column: 4;
+  grid-row: 2;
+}
+
+.Gloves {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+.Boots {
+  grid-column: 4;
+  grid-row: 3;
+}
+
+.Ring {
+  grid-column: 1;
+  grid-row: 4;
+}
+
+.Ring2 {
+  grid-column: 4;
+  grid-row: 4;
+}
+
+.Amulet {
+  grid-column: 1;
+  grid-row: 5;
+}
+
+.Belt {
+  grid-column: 4;
+  grid-row: 5;
+}
+
+.Flask {
+  grid-column: 2;
+  grid-row: 5;
+}
+
+.Flask2 {
+  grid-column: 2;
+  grid-row: 4;
+}
+
+.Flask3 {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.Flask4 {
+  grid-column: 3;
+  grid-row: 5;
+}
+
+.Flask5 {
+  grid-column: 3;
+  grid-row: 4;
 }
 
 /* Weapon slots */
@@ -383,10 +554,32 @@
   font-size: 14px;
   max-height: 500px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #af6025 #252525;
 }
 
 .itemTooltipVisible {
   opacity: 1;
+  pointer-events: auto; /* Allow interaction when visible */
+}
+
+.itemTooltip::-webkit-scrollbar {
+  width: 8px;
+}
+
+.itemTooltip::-webkit-scrollbar-track {
+  background: #252525;
+  border-radius: 10px;
+}
+
+.itemTooltip::-webkit-scrollbar-thumb {
+  background-color: #af6025;
+  border-radius: 10px;
+  border: 2px solid #252525;
+}
+
+.itemTooltip::-webkit-scrollbar-thumb:hover {
+  background-color: #c27b3e;
 }
 
 .tooltipHeader {
@@ -520,4 +713,186 @@
     max-width: 100%;
     padding: 60px 15px 15px 15px;
   }
+
+  .characterListSidebar {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 1rem;
+  }
+
+  .characterListVertical {
+    max-height: 300px;
+  }
+}
+
+.passiveTreeSection {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #3d3d3d;
+}
+
+.passiveTreeContainer {
+  width: 100%;
+  height: 500px;
+  background-color: rgba(20, 20, 20, 0.8);
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.passiveTreeFrame {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Item frame styles */
+.itemFrame {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 2px solid;
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.8);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.itemFrame:hover {
+  transform: scale(1.05);
+}
+
+.normal {
+  border-color: #7f7f7f;
+}
+
+.magic {
+  border-color: #88f;
+}
+
+.rare {
+  border-color: #ff7;
+}
+
+.unique {
+  border-color: #af6025;
+}
+
+.gem {
+  border-color: #1ba29b;
+}
+
+.currency {
+  border-color: #aa9e82;
+}
+
+.divination {
+  border-color: #0a9eff;
+}
+
+.prophecy {
+  border-color: #b54bff;
+}
+
+.foil {
+  border-color: #82ad6a;
+}
+
+.itemIcon {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.socketCount {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+
+.emptySlot {
+  width: 100%;
+  height: 100%;
+  background-color: rgba(30, 30, 30, 0.5);
+  border: 1px dashed #3d3d3d;
+  border-radius: 4px;
+}
+
+/* Tooltip styles */
+.itemTooltip {
+  position: fixed;
+  z-index: 1000;
+  width: 300px;
+  background-color: rgba(0, 0, 0, 0.9);
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  padding: 8px;
+  color: #fff;
+  font-size: 14px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.itemTooltipVisible {
+  opacity: 1;
+}
+
+.tooltipHeader {
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.tooltipName {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.tooltipType {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.tooltipSection {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.tooltipSection:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.tooltipProperty, .tooltipRequirement {
+  margin-bottom: 2px;
+}
+
+.tooltipRequirementsHeader {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.tooltipMod {
+  margin-bottom: 2px;
+}
+
+.tooltipImplicitMods {
+  color: #88f;
+  margin-bottom: 6px;
+}
+
+.tooltipExplicitMods {
+  color: #8cf;
 }

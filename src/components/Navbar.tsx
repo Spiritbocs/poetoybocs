@@ -2,6 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import dynamic from 'next/dynamic';
+
+// Dynamically import PoeLogin with no SSR to avoid hydration issues
+const PoeLogin = dynamic(() => import('../app/components/PoeLogin'), { ssr: false });
 
 const Navbar = () => {
   const pathname = usePathname();
@@ -58,7 +62,8 @@ const Navbar = () => {
               </Link>
             </div>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center space-x-3">
+            <PoeLogin />
             <a 
               href="https://www.pathofexile.com/trade" 
               target="_blank" 

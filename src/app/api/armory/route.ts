@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
+import { cookies } from 'next/headers';
 
 // Configure this route as dynamic
 export const dynamic = 'force-dynamic';
 
-// Define the Path of Exile API base URL
-const POE_API_BASE = 'https://www.pathofexile.com/character-window';
+// API endpoints
+const BASE_URL = 'https://www.pathofexile.com';
+const POE_API_BASE = 'https://api.pathofexile.com';
+
+// Headers for API requests
+const PUBLIC_HEADERS = {
+  'User-Agent': 'Poetoybocs/1.0 (contact: poetoybocs@example.com)',
+  'Accept': 'application/json',
+};
+
+const DEFAULT_HEADERS = {
+  ...PUBLIC_HEADERS,
+  'Content-Type': 'application/x-www-form-urlencoded',
+};
 
 // Define interfaces for character data
 interface Character {
@@ -15,6 +28,8 @@ interface Character {
   league: string;
   experience: number;
   lastActive: string;
+  classId?: number;
+  ascendancyClass?: number;
   items?: any[];
 }
 
@@ -24,85 +39,90 @@ interface Account {
 }
 
 // Simple in-memory cache
-const accountCache = new Map<string, Account>();
-const cacheExpiry = new Map<string, number>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+const accountCache: Record<string, { data: any, timestamp: number }> = {};
+const characterCache: Record<string, { data: any, timestamp: number }> = {};
 
-// Check if we have valid cached data
-function checkCache(key: string): Account | null {
+const ACCOUNT_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CHARACTER_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+
+// Function to get data from cache
+function getFromCache(cache: Record<string, { data: any, timestamp: number }>, key: string, allowStale = false): any {
+  const entry = cache[key];
+  if (!entry) return null;
+  
   const now = Date.now();
-  if (accountCache.has(key) && cacheExpiry.has(key)) {
-    const expiry = cacheExpiry.get(key) || 0;
-    if (now < expiry) {
-      return accountCache.get(key) || null;
-    }
+  const isExpired = now - entry.timestamp > CHARACTER_CACHE_DURATION;
+  
+  if (!isExpired || allowStale) {
+    return entry.data;
   }
+  
   return null;
 }
 
-// Update cache with new data
-function updateCache(key: string, data: Account): void {
-  accountCache.set(key, data);
-  cacheExpiry.set(key, Date.now() + CACHE_DURATION);
+// Function to update cache
+function updateCache(cache: Record<string, { data: any, timestamp: number }>, key: string, data: any, duration: number): void {
+  cache[key] = {
+    data,
+    timestamp: Date.now()
+  };
+  
+  // Set timeout to clear cache after duration
+  setTimeout(() => {
+    delete cache[key];
+  }, duration);
 }
 
 // Format account name for API requests
 function formatAccountName(accountName: string): string {
-  // Remove leading/trailing whitespace and handle special characters
+  // Remove leading/trailing whitespace
   const trimmed = accountName.trim();
   
-  // If the account name contains a # (like Battle.net tags), ensure it's properly formatted
+  // For Battle.net style account names (with #), we need to remove any spaces
   if (trimmed.includes('#')) {
-    // For Battle.net style account names, we want to keep the format but ensure no extra spaces
+    console.log('Formatting Battle.net style account name:', trimmed);
+    // Remove any spaces
     return trimmed.replace(/\s+/g, '');
   }
   
   return trimmed;
 }
 
-// Convert PoE class names to more readable format
+// Helper functions
 function formatClassName(className: string): string {
-  const classMap: Record<string, string> = {
-    'Scion': 'Scion',
-    'Marauder': 'Marauder',
-    'Ranger': 'Ranger',
-    'Witch': 'Witch',
-    'Duelist': 'Duelist',
-    'Templar': 'Templar',
-    'Shadow': 'Shadow',
-    'Ascendant': 'Scion (Ascendant)',
-    'Juggernaut': 'Marauder (Juggernaut)',
-    'Berserker': 'Marauder (Berserker)',
-    'Chieftain': 'Marauder (Chieftain)',
-    'Raider': 'Ranger (Raider)',
-    'Deadeye': 'Ranger (Deadeye)',
-    'Pathfinder': 'Ranger (Pathfinder)',
-    'Occultist': 'Witch (Occultist)',
-    'Elementalist': 'Witch (Elementalist)',
-    'Necromancer': 'Witch (Necromancer)',
-    'Slayer': 'Duelist (Slayer)',
-    'Gladiator': 'Duelist (Gladiator)',
-    'Champion': 'Duelist (Champion)',
-    'Inquisitor': 'Templar (Inquisitor)',
-    'Hierophant': 'Templar (Hierophant)',
-    'Guardian': 'Templar (Guardian)',
-    'Assassin': 'Shadow (Assassin)',
-    'Trickster': 'Shadow (Trickster)',
-    'Saboteur': 'Shadow (Saboteur)',
-  };
-  
-  return classMap[className] || className;
+  // Convert camelCase or snake_case to Title Case with spaces
+  return className
+    .replace(/([A-Z])/g, ' $1') // Insert a space before all capital letters
+    .replace(/_/g, ' ') // Replace underscores with spaces
+    .replace(/^\s+/, '') // Remove leading space if any
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
 }
 
-// Format the date to a readable string
-function formatLastActive(timestamp: number): string {
+function formatLastActive(timestamp: number | string): string {
   if (!timestamp) return 'Unknown';
   
-  const date = new Date(timestamp * 1000);
+  // If timestamp is a string that can be parsed as a number, convert it
+  const numericTimestamp = typeof timestamp === 'string' 
+    ? parseInt(timestamp, 10) 
+    : timestamp;
+  
+  // Convert timestamp to date
+  const date = new Date(numericTimestamp);
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return 'Invalid date';
+  }
+  
+  // Format date to a readable string
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
   });
 }
 
@@ -123,310 +143,434 @@ function mapFrameTypeToRarity(frameType: number): string {
   }
 }
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const accountName = searchParams.get('accountName');
-  const characterName = searchParams.get('character');
-
-  if (!accountName) {
-    return NextResponse.json({ error: 'Account name is required' }, { status: 400 });
-  }
-
-  const formattedAccountName = formatAccountName(accountName);
+// Check if we have an OAuth token and prepare headers
+function getAuthHeaders() {
+  const token = cookies().get('poe_auth_token')?.value;
   
-  // If a specific character is requested, return only that character with items
-  if (characterName) {
+  if (token) {
+    return {
+      ...DEFAULT_HEADERS,
+      'Authorization': `Bearer ${token}`
+    };
+  }
+  
+  return DEFAULT_HEADERS;
+}
+
+// Function to fetch character items using the authenticated API if possible
+async function fetchCharacterItems(accountName: string, characterName: string) {
+  const token = cookies().get('poe_auth_token')?.value;
+  
+  if (token) {
     try {
-      console.log(`Fetching specific character: ${characterName} for account: ${formattedAccountName}`);
+      // Try to use the authenticated API
+      console.log('Using authenticated API to fetch character items');
+      const response = await axios.get(
+        `${POE_API_BASE}/character/${encodeURIComponent(characterName)}/items`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
       
-      // Setup headers to mimic a browser request to bypass Cloudflare
-      const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://www.pathofexile.com/character-window',
-        'Origin': 'https://www.pathofexile.com',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      };
+      // Ensure we have classId and ascendancyClass in the response
+      if (response.data && response.data.character) {
+        response.data.character.classId = response.data.character.classId || 0;
+        response.data.character.ascendancyClass = response.data.character.ascendancyClass || 0;
+      }
       
-      // Get items for the specific character
-      const itemFormData = {
-        accountName: formattedAccountName,
-        character: characterName,
-        realm: 'pc' // Default to PC realm
-      };
+      return response.data;
+    } catch (error) {
+      console.error('Error using authenticated API, falling back to public API:', error);
+      // Fall back to the public API if the authenticated one fails
+    }
+  }
+  
+  // Use the public API as fallback
+  console.log('Using public API to fetch character items');
+  
+  // For the public API, we need to properly format the account name
+  const formattedName = accountName.trim().replace(/\s+/g, '');
+  console.log('Account and character for API request:', { formattedName, characterName });
+  
+  try {
+    // Try direct URL approach first
+    const directUrl = `${BASE_URL}/character-window/get-items?accountName=${encodeURIComponent(formattedName)}&character=${encodeURIComponent(characterName)}&realm=pc`;
+    console.log('Trying direct URL for items:', directUrl);
+    
+    const response = await axios.get(directUrl, { 
+      headers: DEFAULT_HEADERS,
+      validateStatus: (status) => status < 500 // Accept any status code less than 500
+    });
+    
+    console.log('Direct URL items response status:', response.status);
+    
+    if (response.status === 200) {
+      console.log('Direct URL for items successful');
       
-      console.log('Item request details:', {
-        url: `${POE_API_BASE}/get-items`,
-        formData: itemFormData,
-        method: 'POST'
-      });
-      
+      // For the public API, we need to fetch additional character data to get classId and ascendancyClass
       try {
-        const itemsResponse = await axios.post(
-          `${POE_API_BASE}/get-items`,
-          new URLSearchParams(itemFormData).toString(),
-          { headers }
-        );
+        // Try direct URL for passive skills
+        const passiveUrl = `${BASE_URL}/character-window/get-passive-skills?accountName=${encodeURIComponent(formattedName)}&character=${encodeURIComponent(characterName)}&realm=pc`;
+        console.log('Trying direct URL for passive skills:', passiveUrl);
         
-        if (!itemsResponse.data) {
-          throw new Error('Invalid items response format');
+        const charResponse = await axios.get(passiveUrl, {
+          headers: DEFAULT_HEADERS,
+          validateStatus: (status) => status < 500
+        });
+        
+        console.log('Direct URL passive skills response status:', charResponse.status);
+        
+        if (response.data && response.data.character && charResponse.status === 200) {
+          response.data.character.classId = charResponse.data.character?.classId || 0;
+          response.data.character.ascendancyClass = charResponse.data.character?.ascendancyClass || 0;
         }
+      } catch (error: any) {
+        console.error('Error fetching additional character data:', error.message);
+        // Continue even if we couldn't get the class data
+      }
+      
+      return response.data;
+    }
+    
+    // If direct URL fails, try POST method
+    console.log('Direct URL for items failed, trying POST method');
+    
+    const itemFormData = {
+      accountName: formattedName,
+      character: characterName,
+      realm: 'pc' // Default to PC realm
+    };
+    
+    const postResponse = await axios.post(
+      `${BASE_URL}/character-window/get-items`,
+      new URLSearchParams(itemFormData).toString(),
+      { headers: DEFAULT_HEADERS }
+    );
+    
+    console.log('POST items response status:', postResponse.status);
+    
+    // For the public API, we need to fetch additional character data to get classId and ascendancyClass
+    try {
+      const charResponse = await axios.post(
+        `${BASE_URL}/character-window/get-passive-skills`,
+        new URLSearchParams({
+          accountName: formattedName,
+          character: characterName,
+          realm: 'pc'
+        }).toString(),
+        { headers: DEFAULT_HEADERS }
+      );
+      
+      console.log('POST passive skills response status:', charResponse.status);
+      
+      if (postResponse.data && postResponse.data.character && charResponse.data) {
+        postResponse.data.character.classId = charResponse.data.character?.classId || 0;
+        postResponse.data.character.ascendancyClass = charResponse.data.character?.ascendancyClass || 0;
+      }
+    } catch (error: any) {
+      console.error('Error fetching additional character data:', error.message);
+      // Continue even if we couldn't get the class data
+    }
+    
+    return postResponse.data;
+  } catch (error: any) {
+    console.error('Error fetching character items from public API:', error.message);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
+    throw error;
+  }
+}
+
+// Function to fetch characters using the authenticated API if possible
+async function fetchCharacters(accountName: string) {
+  console.log(`Fetching characters for account: ${accountName}`);
+  
+  try {
+    // First try authenticated API if we have a token
+    const token = cookies().get('poe_auth_token')?.value;
+    
+    if (token) {
+      try {
+        console.log('Using authenticated API for character fetch');
+        const response = await axios.get(`${POE_API_BASE}/character`, {
+          headers: {
+            ...DEFAULT_HEADERS,
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
-        // Get character details from the characters endpoint
-        const charactersResponse = await axios.post(
-          `${POE_API_BASE}/get-characters`,
-          new URLSearchParams({ accountName: formattedAccountName }).toString(),
-          { headers }
-        );
-        
-        if (!charactersResponse.data || !Array.isArray(charactersResponse.data)) {
-          throw new Error('Invalid characters response format');
+        if (response.data && Array.isArray(response.data)) {
+          console.log(`Found ${response.data.length} characters via authenticated API`);
+          return response.data;
+        } else {
+          console.log('Unexpected response format from authenticated API:', response.data);
         }
-        
-        const characterDetails = charactersResponse.data.find((char: any) => char.name === characterName);
-        
-        if (!characterDetails) {
-          throw new Error(`Character ${characterName} not found`);
-        }
-        
-        // Return the character with items
-        return NextResponse.json({
+      } catch (error) {
+        console.error('Error using authenticated API:', error);
+        // Fall through to public API
+      }
+    }
+    
+    // Fall back to public API
+    console.log('Using public API for character fetch');
+    const response = await axios.get(
+      `${BASE_URL}/character-window/get-characters?accountName=${encodeURIComponent(accountName)}&realm=pc`,
+      { headers: DEFAULT_HEADERS }
+    );
+    
+    if (response.data && Array.isArray(response.data)) {
+      console.log(`Found ${response.data.length} characters via public API`);
+      return response.data;
+    } else {
+      console.log('Unexpected response format from public API:', response.data);
+      throw new Error('Invalid response format from Path of Exile API');
+    }
+  } catch (error: any) {
+    console.error('Error fetching characters:', error);
+    
+    // Check if this is a "profile is private" error
+    if (error.response?.data?.error?.message === 'Profile tab is private') {
+      throw new Error('This account\'s profile is private. Please make it public in your Path of Exile account settings.');
+    }
+    
+    // Rethrow the error
+    throw error;
+  }
+}
+
+// Function to fetch character data
+async function fetchCharacterData(accountName: string, characterName: string, useStaleCache: boolean) {
+  const characterCacheKey = `${accountName.toLowerCase()}_${characterName.toLowerCase()}`;
+  const cachedCharacter = getFromCache(characterCache, characterCacheKey, useStaleCache);
+  
+  if (cachedCharacter) {
+    console.log(`Using cached data for character: ${characterName}`);
+    return cachedCharacter;
+  }
+  
+  try {
+    // Fetch items for the character
+    const itemsData = await fetchCharacterItems(accountName, characterName);
+    
+    if (!itemsData) {
+      throw new Error('Invalid items response format');
+    }
+    
+    // Fetch character details
+    const charactersData = await fetchCharacters(accountName);
+    
+    if (!charactersData || !Array.isArray(charactersData)) {
+      throw new Error('Invalid characters response format');
+    }
+    
+    const characterDetails = charactersData.find((char: any) => char.name === characterName);
+    
+    if (!characterDetails) {
+      throw new Error(`Character ${characterName} not found`);
+    }
+    
+    // Check if items array exists and is valid
+    const items = itemsData.items || [];
+    if (!Array.isArray(items)) {
+      console.warn(`No items array found for character ${characterName}, using empty array`);
+    }
+    
+    // Create the character data
+    const characterData = {
+      character: {
+        name: characterDetails.name,
+        class: formatClassName(characterDetails.class),
+        level: characterDetails.level,
+        league: characterDetails.league,
+        experience: characterDetails.experience,
+        lastActive: formatLastActive(characterDetails.lastActive),
+        classId: itemsData.character?.classId,
+        ascendancyClass: itemsData.character?.ascendancyClass,
+      },
+      items: Array.isArray(items) ? items : []
+    };
+    
+    // Cache the character data
+    updateCache(characterCache, characterCacheKey, characterData, CHARACTER_CACHE_DURATION);
+    
+    console.log('Returning character data with items:', 
+      JSON.stringify({
+        ...characterData,
+        items: `[${Array.isArray(items) ? items.length : 0} items]` // Just log the count to avoid huge logs
+      })
+    );
+    
+    return characterData;
+  } catch (error) {
+    console.error(`Error fetching items for character ${characterName}:`, error);
+    
+    // Check if this is a rate limiting error
+    const axiosError = error as any;
+    if (axiosError.response && axiosError.response.status === 429) {
+      const retryAfter = axiosError.response.headers['retry-after'] || 60;
+      console.log(`Rate limited by Path of Exile API. Retry after ${retryAfter} seconds.`);
+      
+      // Try to use stale cache as fallback
+      const staleCharacter = getFromCache(characterCache, characterCacheKey, true);
+      if (staleCharacter) {
+        console.log(`Using stale cache for character ${characterName} due to rate limiting`);
+        return {
+          ...staleCharacter,
+          fromStaleCache: true,
+          rateLimited: true,
+          retryAfter
+        };
+      }
+      
+      return {
+        error: `Rate limited by Path of Exile API. Please try again in ${Math.ceil(retryAfter / 60)} minutes.`,
+        retryAfter: retryAfter
+      };
+    }
+    
+    // If we failed to get items, try to at least return the character info
+    try {
+      const charactersData = await fetchCharacters(accountName);
+      
+      if (!charactersData || !Array.isArray(charactersData)) {
+        throw new Error('Invalid characters response format');
+      }
+      
+      const characterDetails = charactersData.find((char: any) => char.name === characterName);
+      
+      if (!characterDetails) {
+        throw new Error(`Character ${characterName} not found`);
+      }
+      
+      // Create character data with empty items
+      const characterData = {
+        character: {
           name: characterDetails.name,
           class: formatClassName(characterDetails.class),
           level: characterDetails.level,
           league: characterDetails.league,
           experience: characterDetails.experience,
           lastActive: formatLastActive(characterDetails.lastActive),
-          items: itemsResponse.data.items || []
-        });
-      } catch (error) {
-        console.error(`Error fetching items for character ${characterName}:`, error);
-        
-        // If we failed to get items, try to at least return the character info
-        try {
-          const charactersResponse = await axios.post(
-            `${POE_API_BASE}/get-characters`,
-            new URLSearchParams({ accountName: formattedAccountName }).toString(),
-            { headers }
-          );
-          
-          if (!charactersResponse.data || !Array.isArray(charactersResponse.data)) {
-            throw new Error('Invalid characters response format');
-          }
-          
-          const characterDetails = charactersResponse.data.find((char: any) => char.name === characterName);
-          
-          if (!characterDetails) {
-            throw new Error(`Character ${characterName} not found`);
-          }
-          
-          // Return the character with an empty items array
-          return NextResponse.json({
-            name: characterDetails.name,
-            class: formatClassName(characterDetails.class),
-            level: characterDetails.level,
-            league: characterDetails.league,
-            experience: characterDetails.experience,
-            lastActive: formatLastActive(characterDetails.lastActive),
-            items: [] // Empty items array
-          });
-        } catch (charError) {
-          console.error(`Error fetching character ${characterName}:`, charError);
-          return NextResponse.json({ error: 'Failed to fetch character data' }, { status: 500 });
-        }
-      }
-    } catch (error) {
-      console.error(`Error processing character request for ${characterName}:`, error);
-      return NextResponse.json({ error: 'Failed to process character request' }, { status: 500 });
-    }
-  } else {
-    // Check if we have cached data for this account
-    const cacheKey = formattedAccountName.toLowerCase();
-    const cachedData = checkCache(cacheKey);
-    
-    if (cachedData) {
-      return NextResponse.json(cachedData);
-    }
-    
-    try {
-      console.log(`Fetching characters for account: ${formattedAccountName}`);
-      
-      // Setup headers to mimic a browser request to bypass Cloudflare
-      const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://www.pathofexile.com/',
-        'Origin': 'https://www.pathofexile.com',
-        'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        items: [] // Empty items array
       };
       
-      // Log the request details for debugging
-      console.log('Character request details:', {
-        url: `${POE_API_BASE}/get-characters`,
-        formData: { accountName: formattedAccountName },
-        method: 'POST'
-      });
+      // Cache this limited data
+      updateCache(characterCache, characterCacheKey, characterData, CHARACTER_CACHE_DURATION);
       
-      // Use POST with form data instead of GET with query params
-      const charactersResponse = await axios.post(
-        `${POE_API_BASE}/get-characters`,
-        new URLSearchParams({ accountName: formattedAccountName }).toString(),
-        { headers }
-      );
+      return characterData;
+    } catch (charError) {
+      console.error(`Error fetching character ${characterName}:`, charError);
+      return {
+        error: 'Failed to fetch character data'
+      };
+    }
+  }
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const accountName = searchParams.get('accountName');
+  const characterName = searchParams.get('characterName');
+  const useStaleCache = searchParams.get('useStaleCache') === 'true';
+
+  console.log('API Request received:', {
+    accountName,
+    characterName,
+    useStaleCache
+  });
+
+  if (!accountName) {
+    return NextResponse.json({ error: 'Account name is required' }, { status: 400 });
+  }
+
+  try {
+    // Format account name for Battle.net style accounts
+    console.log('Formatting Battle.net style account name:', accountName);
+    const formattedAccountName = formatAccountName(accountName);
+    console.log('Formatted account name:', formattedAccountName);
+
+    if (characterName) {
+      // Fetch specific character data
+      const characterData = await fetchCharacterData(formattedAccountName, characterName, useStaleCache);
+      return NextResponse.json(characterData);
+    } else {
+      // Fetch all characters for the account
+      console.log('Fetching characters for account:', formattedAccountName);
+      const characters = await fetchCharacters(formattedAccountName);
+      console.log('Found', characters.length, 'characters via public API');
+      console.log('Returning account data with characters:', characters.length);
       
-      if (!charactersResponse.data || charactersResponse.data.error) {
-        throw new Error(charactersResponse.data?.error || 'Failed to fetch characters');
-      }
-      
-      // Process character data
-      const characters: Character[] = await Promise.all(
-        charactersResponse.data.map(async (char: any) => {
-          // Fetch items for each character
-          try {
-            console.log(`Fetching items for character: ${char.name}`);
-            
-            // Log the item request details for debugging
-            const itemFormData = {
-              accountName: formattedAccountName,
-              character: char.name,
-              realm: 'pc' // Default to PC realm
-            };
-            
-            console.log('Item request details:', {
-              url: `${POE_API_BASE}/get-items`,
-              formData: itemFormData,
-              method: 'POST'
-            });
-            
-            // Enhanced headers for item requests
-            const itemHeaders = {
-              ...headers,
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-              'Accept': 'application/json',
-              'Accept-Language': 'en-US,en;q=0.9',
-              'Referer': 'https://www.pathofexile.com/character-window',
-              'Origin': 'https://www.pathofexile.com',
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache'
-            };
-            
-            // Use POST with form data for items with enhanced headers
-            const itemsResponse = await axios.post(
-              `${POE_API_BASE}/get-items`,
-              new URLSearchParams(itemFormData).toString(),
-              { headers: itemHeaders }
-            );
-            
-            if (!itemsResponse.data || !itemsResponse.data.items) {
-              console.error(`Invalid items response for character ${char.name}:`, itemsResponse.data);
-              throw new Error('Invalid items response format');
-            }
-            
-            const items = itemsResponse.data.items || [];
-            
-            // Log the first item to debug
-            if (items.length > 0) {
-              console.log(`Sample item for ${char.name}:`, {
-                name: items[0].name,
-                typeLine: items[0].typeLine,
-                icon: items[0].icon,
-                inventoryId: items[0].inventoryId
-              });
-            } else {
-              console.log(`No items found for character ${char.name}`);
-            }
-            
-            return {
-              name: char.name,
-              class: formatClassName(char.class),
-              level: char.level,
-              league: char.league,
-              experience: char.experience,
-              lastActive: formatLastActive(char.lastActive),
-              items: items.map((item: any) => ({
-                id: item.id || `${item.inventoryId}-${Date.now()}`,
-                name: item.name,
-                typeLine: item.typeLine,
-                baseType: item.baseType,
-                identified: item.identified,
-                itemLevel: item.ilvl,
-                frameType: item.frameType,
-                icon: item.icon, // Make sure icon URL is passed correctly
-                inventoryId: item.inventoryId, // This is critical for equipment slot rendering
-                socketedItems: item.socketedItems,
-                sockets: item.sockets,
-                properties: item.properties,
-                requirements: item.requirements,
-                explicitMods: item.explicitMods,
-                implicitMods: item.implicitMods,
-                craftedMods: item.craftedMods,
-                enchantMods: item.enchantMods,
-                flavourText: item.flavourText,
-                corrupted: item.corrupted,
-                support: item.support,
-                stackSize: item.stackSize,
-                maxStackSize: item.maxStackSize
-              }))
-            };
-          } catch (error) {
-            console.error(`Error fetching items for character ${char.name}:`, error);
-            // If we can't get items, still return the character with an empty items array
-            return {
-              name: char.name,
-              class: formatClassName(char.class),
-              level: char.level,
-              league: char.league,
-              experience: char.experience,
-              lastActive: formatLastActive(char.lastActive),
-              items: [] // Always include an empty items array
-            };
-          }
-        })
-      );
-      
+      // Return characters in the correct format
       const accountData = {
-        name: accountName,
-        characters
+        account: {
+          name: formattedAccountName,
+          characters: characters.map((character: any) => ({
+            name: character.name,
+            class: formatClassName(character.class),
+            level: character.level,
+            league: character.league,
+            experience: character.experience,
+            lastActive: formatLastActive(character.lastActive),
+          }))
+        }
       };
-      
-      // Cache the data
-      updateCache(cacheKey, accountData);
       
       return NextResponse.json(accountData);
+    }
+  } catch (error) {
+    console.error('Error in API route:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'An unknown error occurred' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { accountName, characterName, useStaleCache = false } = body;
+    
+    if (!accountName || !characterName) {
+      return NextResponse.json({ error: 'Account name and character name are required' }, { status: 400 });
+    }
+    
+    console.log('POST request received for character data:', { accountName, characterName });
+    
+    // Format account name to handle Battle.net style names
+    const formattedAccountName = formatAccountName(accountName);
+    console.log('Formatted account name:', formattedAccountName);
+    
+    try {
+      // Fetch character data with items
+      const characterData = await fetchCharacterData(formattedAccountName, characterName, useStaleCache);
+      return NextResponse.json(characterData);
     } catch (error: any) {
-      console.error('Error fetching account data:', error);
+      console.error('Error fetching character data:', error);
       
-      // Handle specific API errors
-      if (error.response) {
-        const status = error.response.status;
-        const responseData = error.response.data;
-        
-        console.log('API Error Response:', {
-          status,
-          data: responseData
-        });
-        
-        if (status === 404) {
-          return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-        } else if (status === 403) {
-          return NextResponse.json({ 
-            error: 'Account profile is private or Cloudflare is blocking the request. Try again later.',
-            details: 'The Path of Exile API is protected by Cloudflare, which may block automated requests.',
-            cloudflare: true
-          }, { status: 403 });
-        }
+      // Check for rate limiting
+      if (error.response && error.response.status === 429) {
+        const retryAfter = error.response.headers['retry-after'] || 60;
+        return NextResponse.json(
+          { error: 'Rate limited by Path of Exile API', retryAfter },
+          { status: 429 }
+        );
       }
       
-      return NextResponse.json({ 
-        error: 'Failed to fetch account data', 
-        message: error.message || 'Unknown error',
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      }, { status: 500 });
+      // Handle other errors
+      return NextResponse.json(
+        { error: error.message || 'An error occurred while fetching character data' },
+        { status: 500 }
+      );
     }
+  } catch (error: any) {
+    console.error('Error parsing request body:', error);
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 }
