@@ -645,45 +645,35 @@ private oauthConfig: OAuthConfig = {
   }
 
   async searchItems(league: string, query: any): Promise<TradeSearchResult> {
+    // Use internal proxy to avoid CORS & reduce payload
     try {
-      const response = await fetch(`${this.tradeUrl}/search/${encodeURIComponent(league)}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "PoE-Market-Tracker/1.0",
-        },
-        body: JSON.stringify(query),
+      const res = await fetch('/api/trade/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ league, query })
       })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-      return data
-    } catch (error) {
-      console.error("Error searching items:", error)
-      throw error
+      if (!res.ok) throw new Error(`proxy_http_${res.status}`)
+      const json = await res.json()
+      return json
+    } catch (e) {
+      console.error('Trade search proxy failed', e)
+      throw e
     }
   }
 
   async getItemDetails(searchId: string, itemIds: string[]): Promise<TradeItem[]> {
     try {
-      const limitedIds = itemIds.slice(0, 10)
-      const response = await fetch(`${this.tradeUrl}/fetch/${limitedIds.join(",")}?query=${searchId}`, {
-        headers: {
-          "User-Agent": "PoE-Market-Tracker/1.0",
-        },
+      const ids = itemIds.slice(0, 20)
+      const res = await fetch('/api/trade/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, query: searchId })
       })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-      return data.result || []
-    } catch (error) {
-      console.error("Error fetching item details:", error)
+      if (!res.ok) throw new Error(`proxy_http_${res.status}`)
+      const json = await res.json()
+      return Array.isArray(json.result) ? json.result : []
+    } catch (e) {
+      console.error('Trade fetch proxy failed', e)
       return []
     }
   }
@@ -759,6 +749,17 @@ private oauthConfig: OAuthConfig = {
 
   private setCachedData(key: string, data: any): void {
     this.cache.set(key, { data, timestamp: Date.now() })
+  }
+
+  /**
+   * Compute a simple average chaos price from trade items (assumes same currency)
+   */
+  averageListingPrice(items: TradeItem[]): { average: number; currency: string } | null {
+    const priced = items.filter(i=> i.listing.price && typeof i.listing.price.amount==='number')
+    if (!priced.length) return null
+    const currency = priced[0].listing.price!.currency
+    const avg = priced.reduce((sum,i)=> sum + (i.listing.price!.amount||0),0) / priced.length
+    return { average: avg, currency }
   }
 }
 

@@ -227,7 +227,7 @@ export function ItemPriceChecker() {
           />
           <div style={{display:'flex',gap:12,alignItems:'center'}}>
             <button onClick={handleSearch} disabled={loading || !rawClipboard.trim()} className="btn btn-accent">{loading? 'Pricing…':'Price It'}</button>
-            {priceSummary && <div style={{fontSize:12,opacity:.7}}>Listings: {priceSummary.count} • Avg: {priceSummary.average.toFixed(1)}c • Conf {priceSummary.confidence}%</div>}
+            {priceSummary && <div style={{fontSize:12,opacity:.7}}>Listings: {priceSummary.count} • Avg: {priceSummary.average.toFixed(1)}c • Suggested List: {(priceSummary.average).toFixed(1)}c • Conf {priceSummary.confidence}%</div>}
             {error && <div style={{fontSize:12,color:'#ff6a6a'}}>{error}</div>}
             {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#67bfff',textDecoration:'none'}}>Open Trade ↗</a>}
           </div>
@@ -253,6 +253,7 @@ export function ItemPriceChecker() {
                   <div><span style={{opacity:.55}}>Median</span><div style={{fontWeight:600}}>{priceSummary.median.toFixed(1)}</div></div>
                   <div><span style={{opacity:.55}}>Avg</span><div style={{fontWeight:600}}>{priceSummary.average.toFixed(1)}</div></div>
                   <div><span style={{opacity:.55}}>Max</span><div style={{fontWeight:600}}>{priceSummary.max.toFixed(1)}</div></div>
+                  <div><span style={{opacity:.55}}>Suggested</span><div style={{fontWeight:600,color:'#57d977'}}>{priceSummary.average.toFixed(1)}c</div></div>
                 </div>
                 <div style={{marginLeft:'auto',fontSize:11,opacity:.5,display:'flex',gap:12,alignItems:'center'}}>
                   <span>Heuristic • Conf {priceSummary.confidence}%</span>

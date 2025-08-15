@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 
 // Simple proxy to PoE trade search API to bypass browser CORS restrictions
 // Body: { league: string, query: any }
+// Returns a trimmed subset of the upstream response: id, total count, and result id list (capped)
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(()=>null)
@@ -23,8 +24,10 @@ export async function POST(req: Request) {
     if (!res.ok) {
       return NextResponse.json({ error: 'upstream_error', status: res.status }, { status: 502 })
     }
-    const json = await res.json()
-    return NextResponse.json({ id: json?.id, total: json?.total ?? 0 })
+  const json = await res.json()
+  // Cap result ids to avoid huge payloads
+  const result: string[] = Array.isArray(json?.result) ? json.result.slice(0, 100) : []
+  return NextResponse.json({ id: json?.id, total: json?.total ?? 0, result })
   } catch (e:any) {
     return NextResponse.json({ error: 'proxy_failure', message: e?.message }, { status: 500 })
   }
