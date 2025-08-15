@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from 'next/navigation'
+// Removed detail page navigation
 import { Sparkline } from "./sparkline"
 import { poeApi, type CurrencyData } from "@/lib/poe-api"
 
@@ -25,7 +25,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
   const [countdown, setCountdown] = useState<string>("")
   const [age, setAge] = useState<string>("")
   const [showLowConfidence, setShowLowConfidence] = useState(()=> (typeof window!=='undefined' ? localStorage.getItem('global_show_low_confidence') === '1' : false))
-  const router = useRouter()
+  // router removed
   const [tooltip, setTooltip] = useState<{ x:number; y:number; currency:CurrencyData | null; spark:number[]; change7d:number; change24h:number } | null>(null)
   // respond to initialType changes (sidebar navigation)
   useEffect(() => { if (initialType && initialType !== type) { setType(initialType); localStorage.setItem('global_currency_type', initialType) } }, [initialType])
@@ -383,11 +383,6 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                 return (
                   <tr key={index}
                     onMouseLeave={()=> setTooltip(null)}
-                    onClick={()=>{
-                      const slug = currency.detailsId || currency.currencyTypeName.replace(/[^a-z0-9]+/gi,'-').toLowerCase()
-                      router.push(`/detail/currency/${slug}?league=${encodeURIComponent(selectedLeague)}&type=${encodeURIComponent(type)}&realm=${encodeURIComponent(realm)}`)
-                    }}
-                    style={{cursor:'pointer'}}
                   >
                     <td className="sticky-col">
                       <div className="flex items-center gap-2 justify-between" style={{width:'100%', position:'relative'}}
@@ -526,7 +521,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
             <div className="tt-line" style={{color: tooltip.change24h>0? '#57d977': tooltip.change24h<0? '#ff6a6a':'#d5c186'}}>~24h: {tooltip.change24h>0?'+':''}{Math.round(tooltip.change24h)}%</div>
             {(() => { const ce = tooltip.currency.chaosEquivalent; if (!ce) return null; return <div className="tt-line">Chaos: <strong>{ce.toFixed(2)}</strong></div> })()}
             {(() => { const de = tooltip.currency.divineEquivalent; if (!de) return null; return <div className="tt-line">Divine: <strong>{de.toFixed(4)}</strong></div> })()}
-            <div className="tt-line" style={{opacity:.55, marginTop:4}}>Click row for details</div>
+            <div className="tt-line" style={{opacity:.45, marginTop:4}}>Detail pages disabled</div>
           </div>
         )}
       </div>
