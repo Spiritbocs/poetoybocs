@@ -267,9 +267,11 @@ private oauthConfig: OAuthConfig = {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
+        let errorData: any = {}
+        try { errorData = await response.json() } catch { /* ignore */ }
         console.error("OAuth token exchange error:", response.status, errorData)
-        throw new Error(`OAuth token exchange failed: ${response.status} - ${errorData.error}`)
+        const desc = errorData.error_description || errorData.error || 'unknown_error'
+        throw new Error(`OAuth token exchange failed: ${response.status} - ${desc}`)
       }
 
       const token = await response.json()

@@ -40,8 +40,9 @@ export async function POST(request: Request) {
 
     const envRedirect = process.env.NEXT_PUBLIC_POE_REDIRECT_URI || ""
     const envClientId = process.env.NEXT_PUBLIC_POE_CLIENT_ID || ""
-    const clientSecret = process.env.POE_CLIENT_SECRET || ""
-    const hasSecret = !!clientSecret
+  // For PoE OAuth with PKCE treat app as public; ignore client secret during investigation to rule out secret issues
+  const clientSecret = process.env.POE_CLIENT_SECRET || ""
+  const hasSecret = false // force omit while debugging 403 (set true later if needed)
 
     if (!envClientId || !envRedirect) {
       console.error("OAuth env missing", { envClientIdSet: !!envClientId, envRedirectSet: !!envRedirect })
@@ -68,9 +69,17 @@ export async function POST(request: Request) {
       code_verifier: codeVerifier,
       scope: "account:profile",
     })
-    if (hasSecret) {
-      form.set("client_secret", clientSecret)
-    }
+    // Intentionally not adding client_secret due to PKCE public client flow
+
+    console.log("Outgoing token form (sanitized)", {
+      grant_type: form.get('grant_type'),
+      client_id: form.get('client_id'),
+      redirect_uri: form.get('redirect_uri'),
+      code_present: !!form.get('code'),
+      code_verifier_len: form.get('code_verifier')?.length,
+      scope: form.get('scope'),
+      included_client_secret: form.has('client_secret')
+    })
 
     let upstream: Response
     try {
