@@ -37,14 +37,11 @@ export default function OAuthCallback() {
       try {
         await poeApi.exchangeCodeForToken(code, state)
         setStatus("success")
-
-        // Redirect to main app after 2 seconds
-        setTimeout(() => {
-          router.push("/")
-        }, 2000)
-      } catch (err) {
+        setTimeout(() => router.push("/"), 1500)
+      } catch (err: any) {
         setStatus("error")
-        setError(err instanceof Error ? err.message : "Authentication failed")
+        const msg = err?.message || (typeof err === 'string' ? err : 'Authentication failed')
+        setError(msg)
       }
     }
 
