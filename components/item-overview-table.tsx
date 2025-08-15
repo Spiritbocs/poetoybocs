@@ -53,6 +53,23 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
     return v < 0.1 ? v.toFixed(3) : v.toFixed(2)
   }
 
+  // Build PoE trade search URL for arbitrary item lines (uniques, fossils, etc.)
+  function buildItemTradeUrl(line: any): string | null {
+    // Skip chaos orb (handled on currency tab)
+    const nm = (line.name || line.currencyTypeName || '').toLowerCase()
+    if (nm === 'chaos orb') return null
+    const query: any = { query: { status: { option: 'online' } }, sort: { price: 'asc' } }
+    const name = line.name && line.name.trim() ? line.name : null
+    const base = line.baseType && line.baseType.trim() && line.baseType !== line.name ? line.baseType : null
+    const ctn = line.currencyTypeName && line.currencyTypeName.trim() ? line.currencyTypeName : null
+    if (name && base) { query.query.name = name; query.query.type = base }
+    else if (name) { query.query.name = name }
+    else if (base) { query.query.type = base }
+    else if (ctn) { query.query.name = ctn }
+    else return null
+    return `https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(query))}`
+  }
+
   if (loading) return <div className="loading"><div className="spinner"/>Loading {title}...</div>
 
   return (
@@ -150,7 +167,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
                   <td><Spark data={spark.slice(-24)} /></td>
                   <td className={getTrendColor(change)} title={change !== undefined ? `${change.toFixed(2)}%` : '0%'}>{formatChange(change)}</td>
                   <td title={`Approximate listings: ${listed}`}>~{listed >=1000? `${Math.round(listed/100)/10}k`: listed}</td>
-                  <td>{name.toLowerCase()==='chaos orb' ? null : <button className="trade-icon-btn" title="Open trade (coming soon)">↗</button>}</td>
+                  <td>{(() => { const url = buildItemTradeUrl(l); return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="trade-icon-btn" title="Open trade in new tab">↗</a> : null })()}</td>
                 </tr>
               )
             })}
