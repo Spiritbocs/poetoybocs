@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from 'next/navigation'
 import { Sparkline } from "./sparkline"
 import { poeApi, type CurrencyData } from "@/lib/poe-api"
 
@@ -24,6 +25,8 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
   const [countdown, setCountdown] = useState<string>("")
   const [age, setAge] = useState<string>("")
   const [showLowConfidence, setShowLowConfidence] = useState(false)
+  const router = useRouter()
+  const [tooltip, setTooltip] = useState<{ x:number; y:number; currency:CurrencyData | null; spark:number[]; change7d:number; change24h:number } | null>(null)
   // respond to initialType changes (sidebar navigation)
   useEffect(() => { if (initialType && initialType !== type) setType(initialType) }, [initialType])
   const [chaosIcon, setChaosIcon] = useState<string | null>(null)
@@ -339,6 +342,8 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                 const sparkSource = mode === 'buy' ? (currency.receiveSparkLine || currency.paySparkLine) : (currency.paySparkLine || currency.receiveSparkLine)
                 const spark = sparkSource?.data || []
                 const change = sparkSource?.totalChange
+                const seg = Math.max(1, Math.round(spark.length/7))
+                const change24 = (()=>{ if (spark.length<2) return 0; const first = spark[spark.length - seg] ?? spark[0]; const last = spark[spark.length-1]; return first? ((last-first)/first)*100 : 0 })()
                 // Listed approximated via max data_point_count similar to poe.ninja representation
                 const listedRaw = Math.max(
                   currency.pay?.data_point_count || 0,
@@ -346,7 +351,16 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                 )
                 const listed = listedRaw >= 1000 ? `${Math.round(listedRaw/100)/10}k` : `${listedRaw}`
                 return (
-                  <tr key={index}>
+                  <tr key={index}
+                    onMouseEnter={(e)=> setTooltip({ x:e.clientX+12, y:e.clientY+12, currency, spark, change7d: change||0, change24h: change24 }) }
+                    onMouseMove={(e)=> setTooltip(t=> t? { ...t, x:e.clientX+12, y:e.clientY+12 }: t)}
+                    onMouseLeave={()=> setTooltip(null)}
+                    onClick={()=>{
+                      const slug = currency.detailsId || currency.currencyTypeName.replace(/[^a-z0-9]+/gi,'-').toLowerCase()
+                      router.push(`/detail/currency/${slug}`)
+                    }}
+                    style={{cursor:'pointer'}}
+                  >
                     <td className="sticky-col">
                       <div className="flex items-center gap-2 justify-between" style={{width:'100%'}}>
                         <div className="flex items-center gap-2">
@@ -430,7 +444,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                       </div>
                     </td>
                     <td>
-                      <Sparkline data={spark.slice(-24)} />
+                      <Sparkline data={spark.slice(-24)} delayMs={index*35} />
                     </td>
                     <td>
                       <span style={{
@@ -468,6 +482,16 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
             )}
           </tbody>
         </table>
+        {tooltip && tooltip.currency && (
+          <div className="poe-tooltip" style={{position:'fixed', left: tooltip.x, top: tooltip.y}}>
+            <h4 style={{margin:0}}>{tooltip.currency.currencyTypeName}</h4>
+            <div className="tt-line">7d Change: {tooltip.change7d>0?'+':''}{Math.round(tooltip.change7d)}%</div>
+            <div className="tt-line">~24h Change: {tooltip.change24h>0?'+':''}{Math.round(tooltip.change24h)}%</div>
+            {(() => { const ce = tooltip.currency.chaosEquivalent; if (!ce) return null; return <div className="tt-line">Chaos Eq: {ce.toFixed(2)}</div> })()}
+            {(() => { const de = tooltip.currency.divineEquivalent; if (!de) return null; return <div className="tt-line">Divine Eq: {de.toFixed(4)}</div> })()}
+            <div className="tt-line" style={{opacity:.7}}>Click for detail view</div>
+          </div>
+        )}
       </div>
     </div>
   )

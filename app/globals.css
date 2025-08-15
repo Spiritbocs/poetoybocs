@@ -358,6 +358,13 @@ body {
 .sparkline-box { position:relative; display:inline-flex; }
 .sparkline-bg { fill:rgba(255,255,255,0.03); stroke:rgba(255,255,255,0.08); }
 .sparkline-box svg { display:block; }
+@keyframes sparkDraw { to { stroke-dashoffset:0; } }
+@keyframes sparkFade { to { opacity:1; } }
+
+/* Simple PoE-style tooltip container (will be used for future rich hover details) */
+.poe-tooltip { position:absolute; pointer-events:none; background:linear-gradient(#1e1e1e,#111); border:1px solid #65552e; box-shadow:0 0 0 1px #2d2514, 0 4px 10px rgba(0,0,0,.6); padding:8px 10px; border-radius:6px; font-size:12px; max-width:260px; line-height:1.3; z-index:1000; }
+.poe-tooltip h4 { margin:0 0 4px; font-size:13px; color:#d4b15a; }
+.poe-tooltip .tt-line { color:#d0d0d0; }
 
 /* Icon buttons (wiki + trade share base style) */
 .icon-btn { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; background:#272727; color:#d5d5d5; border:1px solid #3a3a3a; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600; letter-spacing:.4px; transition:background .12s, color .12s, border-color .12s; }

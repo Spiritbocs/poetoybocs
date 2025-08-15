@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { poeApi } from '@/lib/poe-api'
 import { Sparkline } from './sparkline'
 
@@ -12,6 +13,8 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const router = useRouter()
+  const [tooltip, setTooltip] = useState<{ x:number; y:number; row:any; spark:number[]; change7d:number; change24h:number } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -128,12 +131,23 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
             {filtered.map((l,i)=>{
               const spark = l.sparkline?.data || []
               const change = l.sparkline?.totalChange
+              const seg = Math.max(1, Math.round(spark.length/7))
+              const change24 = (()=>{ if (spark.length<2) return 0; const first = spark[spark.length - seg] ?? spark[0]; const last = spark[spark.length-1]; return first? ((last-first)/first)*100 : 0 })()
               const listed = l.listingCount || l.count || l.data_point_count || 0
               const name = l.name || l.baseType || l.currencyTypeName || 'Unknown'
               const chaosEq = l.chaosValue || l.chaosEquivalent
               const divineEq = divineChaos && chaosEq ? chaosEq / divineChaos : undefined
               return (
-                <tr key={i}>
+                <tr key={i}
+                  style={{cursor:'pointer'}}
+                  onMouseEnter={(e)=> setTooltip({ x:e.clientX+12, y:e.clientY+12, row:l, spark, change7d: change||0, change24h: change24 }) }
+                  onMouseMove={(e)=> setTooltip(t=> t? { ...t, x:e.clientX+12, y:e.clientY+12}: t)}
+                  onMouseLeave={()=> setTooltip(null)}
+                  onClick={()=>{
+                    const slug = (l.detailsId || name).toLowerCase().replace(/[^a-z0-9]+/g,'-')
+                    router.push(`/detail/item/${slug}`)
+                  }}
+                >
                   <td className="sticky-col">
                     <div className="flex items-center gap-2 justify-between" style={{width:'100%'}}>
                       <div className="flex items-center gap-2">
@@ -183,7 +197,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
                       })()}
                     </div>
                   </td>
-                  <td><Sparkline data={spark.slice(-24)} changeHint={change} /></td>
+                  <td><Sparkline data={spark.slice(-24)} changeHint={change} delayMs={i*35} /></td>
                   <td className={getTrendColor(change)} title={change !== undefined ? `${change.toFixed(2)}%` : '0%'}>{formatChange(change)}</td>
                   <td title={`Approximate listings: ${listed}`}>~{listed >=1000? `${Math.round(listed/100)/10}k`: listed}</td>
                   <td>{(() => { const url = buildTradeUrl(l); return url ? <a className="trade-icon-btn" href={url} target="_blank" rel="noopener noreferrer" title="Open trade search">↗</a> : null })()}</td>
@@ -192,6 +206,16 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
             })}
           </tbody>
         </table>
+        {tooltip && tooltip.row && (
+          <div className="poe-tooltip" style={{position:'fixed', left: tooltip.x, top: tooltip.y}}>
+            <h4 style={{margin:0}}>{tooltip.row.name || tooltip.row.baseType || tooltip.row.currencyTypeName}</h4>
+            <div className="tt-line">7d Change: {tooltip.change7d>0?'+':''}{Math.round(tooltip.change7d)}%</div>
+            <div className="tt-line">~24h Change: {tooltip.change24h>0?'+':''}{Math.round(tooltip.change24h)}%</div>
+            {(() => { const ce = tooltip.row.chaosValue || tooltip.row.chaosEquivalent; if (!ce) return null; return <div className="tt-line">Chaos Eq: {ce.toFixed(2)}</div> })()}
+            {(() => { if (!divineChaos) return null; const ce = tooltip.row.chaosValue || tooltip.row.chaosEquivalent; if (!ce) return null; const de = ce / divineChaos; return <div className="tt-line">Divine Eq: {de.toFixed(4)}</div> })()}
+            <div className="tt-line" style={{opacity:.7}}>Click for detail view</div>
+          </div>
+        )}
       </div>
     </div>
   )
