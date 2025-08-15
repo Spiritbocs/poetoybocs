@@ -17,6 +17,8 @@ export function ItemPriceChecker() {
   const [selectedLeague, setSelectedLeague] = useState("Mercenaries")
   const [priceSummary, setPriceSummary] = useState<{min:number; max:number; median:number; average:number; count:number; confidence:number} | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [tradeSearchId, setTradeSearchId] = useState<string | null>(null)
+  const [lastQuery, setLastQuery] = useState<any | null>(null)
 
   const persistMode = (m:'simple'|'clipboard')=>{ setMode(m); try{ localStorage.setItem('price_checker_mode',m)}catch{} }
 
@@ -26,8 +28,10 @@ export function ItemPriceChecker() {
       if (!searchTerm.trim()) return
       setLoading(true)
       try {
-        const query = poeApi.buildItemQuery(searchTerm, { online: true })
+  const query = poeApi.buildItemQuery(searchTerm, { online: true })
+  setLastQuery(query)
         const searchResult = await poeApi.searchItems(selectedLeague, query)
+  setTradeSearchId(searchResult.id)
         const itemDetails = await poeApi.getItemDetails(searchResult.id, searchResult.result)
         setSearchResults(itemDetails)
         summarize(itemDetails)
@@ -45,8 +49,10 @@ export function ItemPriceChecker() {
       if (!p || !p.baseType) { setError('Could not parse base type'); return }
       setLoading(true)
       try {
-        const query = buildTradeQueryFromParsed(p)
+  const query = buildTradeQueryFromParsed(p)
+  setLastQuery(query)
         const searchResult = await poeApi.searchItems(selectedLeague, query)
+  setTradeSearchId(searchResult.id)
         const ids = searchResult.result.slice(0, 30) // cap for speed
         const details = await poeApi.getItemDetails(searchResult.id, ids)
         setSearchResults(details)
@@ -118,7 +124,7 @@ export function ItemPriceChecker() {
       if (p.baseType) query.query.type = { option: p.baseType }
       if (p.name && p.name!==p.baseType) query.query.name = p.name
     } else if (rarity==='rare') {
-      if (p.name) query.query.name = p.name
+      // Ignore generated rare name to broaden pool; baseType only.
       if (p.baseType) query.query.type = p.baseType
       query.query.filters.type_filters = { filters: { rarity: { option:'rare' } } }
     } else {
@@ -221,8 +227,9 @@ export function ItemPriceChecker() {
           />
           <div style={{display:'flex',gap:12,alignItems:'center'}}>
             <button onClick={handleSearch} disabled={loading || !rawClipboard.trim()} className="btn btn-accent">{loading? 'Pricing…':'Price It'}</button>
-            {priceSummary && <div style={{fontSize:12,opacity:.7}}>Listings: {priceSummary.count} • Confidence: {priceSummary.confidence}%</div>}
+            {priceSummary && <div style={{fontSize:12,opacity:.7}}>Listings: {priceSummary.count} • Avg: {priceSummary.average.toFixed(1)}c • Conf {priceSummary.confidence}%</div>}
             {error && <div style={{fontSize:12,color:'#ff6a6a'}}>{error}</div>}
+            {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#67bfff',textDecoration:'none'}}>Open Trade ↗</a>}
           </div>
           {parsed && (
             <div style={{display:'flex',flexWrap:'wrap',gap:18,fontSize:12,background:'#161616',border:'1px solid #262626',padding:'10px 14px',borderRadius:6}}>
@@ -247,7 +254,10 @@ export function ItemPriceChecker() {
                   <div><span style={{opacity:.55}}>Avg</span><div style={{fontWeight:600}}>{priceSummary.average.toFixed(1)}</div></div>
                   <div><span style={{opacity:.55}}>Max</span><div style={{fontWeight:600}}>{priceSummary.max.toFixed(1)}</div></div>
                 </div>
-                <div style={{marginLeft:'auto',fontSize:11,opacity:.5}}>Heuristic (not ML) • Confidence {priceSummary.confidence}%</div>
+                <div style={{marginLeft:'auto',fontSize:11,opacity:.5,display:'flex',gap:12,alignItems:'center'}}>
+                  <span>Heuristic • Conf {priceSummary.confidence}%</span>
+                  {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#67bfff',textDecoration:'none'}}>Trade ↗</a>}
+                </div>
               </div>
             </div>
           )}
@@ -270,7 +280,8 @@ export function ItemPriceChecker() {
           <button onClick={handleSearch} disabled={loading || !searchTerm.trim()} className="btn btn-accent">
             {loading ? 'Searching…' : 'Search'}
           </button>
-          {priceSummary && <div className="status status-connected">{priceSummary.count} priced</div>}
+          {priceSummary && <div className="status status-connected">{priceSummary.count} priced • Avg {priceSummary.average.toFixed(1)}c</div>}
+          {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#67bfff',textDecoration:'none'}}>Open Trade ↗</a>}
         </div>
       )}
 
