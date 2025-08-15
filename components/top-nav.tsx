@@ -16,6 +16,8 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
   const [leagues, setLeagues] = useState<League[]>([])
   const [loadingLeagues, setLoadingLeagues] = useState(false)
   const [loadingAuth, setLoadingAuth] = useState(true)
+  const [nextCountdown, setNextCountdown] = useState<string>('')
+  const [age, setAge] = useState<string>('')
   const envReady = (process.env.NEXT_PUBLIC_POE_CLIENT_ID?.length || 0) > 0 && (process.env.NEXT_PUBLIC_POE_REDIRECT_URI?.length || 0) > 0
 
   // Auth init
@@ -55,6 +57,39 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
     return ()=>{ cancelled = true }
   }, [realm])
 
+  // Global timers (read-only; updated by currency tracker via localStorage)
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+      try {
+        const lastStr = localStorage.getItem('global_last_updated')
+        const nextStr = localStorage.getItem('global_next_refresh')
+        const now = Date.now()
+        if (lastStr) {
+          const last = Number(lastStr)
+            if (!isNaN(last)) {
+              const diff = now - last
+              const m = Math.floor(diff/60000)
+              const s = Math.floor((diff%60000)/1000)
+              setAge(`${m}:${s.toString().padStart(2,'0')}`)
+            }
+        }
+        if (nextStr) {
+          const nxt = Number(nextStr)
+          if (!isNaN(nxt)) {
+            const diff = nxt - now
+            if (diff <= 0) setNextCountdown('Refreshing…')
+            else {
+              const m = Math.floor(diff/60000)
+              const s = Math.floor((diff%60000)/1000)
+              setNextCountdown(`${m}:${s.toString().padStart(2,'0')}`)
+            }
+          }
+        }
+      } catch {}
+    }, 1000)
+    return ()=> clearInterval(interval)
+  }, [])
+
   const handleLogin = async () => {
     try {
       const url = await poeApi.getAuthUrl()
@@ -76,8 +111,13 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
         <span style={{color:'var(--poe-gold, #c8aa6e)'}}>Spiritbocs</span>
         <span style={{opacity:.65}}>Tracker</span>
       </div>
-      {/* Center optional future nav links */}
-      <div style={{flex:1}} />
+      {/* Center zone: global timers */}
+      <div style={{flex:1, display:'flex',alignItems:'center',gap:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,fontSize:11,letterSpacing:.5}}>
+          <div title="Time until next scheduled refresh (client-side)" style={{display:'flex',gap:4}}><span style={{opacity:.55}}>Next</span><strong>{nextCountdown || '--:--'}</strong></div>
+          <div title="Age of last fetched currency dataset" style={{display:'flex',gap:4}}><span style={{opacity:.55}}>Age</span><strong>{age || '0:00'}</strong></div>
+        </div>
+      </div>
       {/* Realm & League selectors */}
       <div style={{display:'flex',alignItems:'center',gap:12}}>
   <select aria-label="Realm" value={realm} onChange={e=>onRealmChange(e.target.value as any)} style={selectStyle}>

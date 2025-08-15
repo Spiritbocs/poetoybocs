@@ -16,8 +16,8 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedLeague, setSelectedLeague] = useState(league)
-  const [type, setType] = useState<"Currency" | "Fragment">(initialType || "Currency")
-  const [mode, setMode] = useState<"buy" | "sell">("buy")
+  const [type, setType] = useState<"Currency" | "Fragment">(()=> (initialType || (typeof window!=='undefined' && (localStorage.getItem('global_currency_type') as any)) || 'Currency'))
+  const [mode, setMode] = useState<"buy" | "sell">(()=> (typeof window!=='undefined' && (localStorage.getItem('global_trade_mode') as any)) || 'buy')
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
   // Real-time (10 min) refresh handling
   const REFRESH_INTERVAL_MS = 3 * 60 * 1000 // 3-minute client refresh cadence
@@ -28,7 +28,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
   const router = useRouter()
   const [tooltip, setTooltip] = useState<{ x:number; y:number; currency:CurrencyData | null; spark:number[]; change7d:number; change24h:number } | null>(null)
   // respond to initialType changes (sidebar navigation)
-  useEffect(() => { if (initialType && initialType !== type) setType(initialType) }, [initialType])
+  useEffect(() => { if (initialType && initialType !== type) { setType(initialType); localStorage.setItem('global_currency_type', initialType) } }, [initialType])
   const [chaosIcon, setChaosIcon] = useState<string | null>(null)
   const [divineIcon, setDivineIcon] = useState<string | null>(null)
   const [divineChaos, setDivineChaos] = useState<number | null>(null)
@@ -37,7 +37,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
   useEffect(() => {
     if (!selectedLeague) return
     let abort = false
-    async function fetchCurrencyData(realTime = false) {
+  async function fetchCurrencyData(realTime = false) {
       setLoading(prev => prev && !realTime)
       try {
         const data = await poeApi.getCurrencyData(selectedLeague, type, realm)
@@ -53,12 +53,39 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
         const now = Date.now()
         setLastUpdated(now)
         setNextRefresh(now + REFRESH_INTERVAL_MS)
+        try {
+          localStorage.setItem('currency_cache_data', JSON.stringify({ ts: now, league: selectedLeague, type, data }))
+          localStorage.setItem('global_last_updated', String(now))
+          localStorage.setItem('global_next_refresh', String(now + REFRESH_INTERVAL_MS))
+        } catch {}
       } catch (error) {
         if (!abort) {
           console.error("Failed to fetch currency data:", error)
           setCurrencyData([]); setFilteredData([])
         }
       } finally { if (!abort) setLoading(false) }
+    }
+    // Read cache to guard against manual refresh hammering
+    try {
+      const raw = localStorage.getItem('currency_cache_data')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed.league === selectedLeague && parsed.type === type && Array.isArray(parsed.data)) {
+          setCurrencyData(parsed.data); setFilteredData(parsed.data)
+          if (parsed.ts) { setLastUpdated(parsed.ts); setNextRefresh(parsed.ts + REFRESH_INTERVAL_MS) }
+        }
+      }
+    } catch {}
+    const lastTsStr = typeof window!=='undefined'? localStorage.getItem('global_last_updated') : null
+    if (lastTsStr) {
+      const lastTs = Number(lastTsStr)
+      const nextAllowed = lastTs + REFRESH_INTERVAL_MS
+      const now = Date.now()
+      if (now < nextAllowed - 1500) { // schedule fetch at nextAllowed
+        setNextRefresh(nextAllowed)
+        const timeout = setTimeout(()=> fetchCurrencyData(false), nextAllowed - now)
+        return ()=> { abort = true; clearTimeout(timeout) }
+      }
     }
     fetchCurrencyData()
     const interval = setInterval(()=>fetchCurrencyData(true), REFRESH_INTERVAL_MS)
@@ -77,6 +104,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
       const m = Math.floor(diff/60000)
       const s = Math.floor((diff%60000)/1000)
       setCountdown(`${m}:${s.toString().padStart(2,'0')}`)
+      try { localStorage.setItem('global_next_refresh', String(nextRefresh)) } catch {}
     }, 1000)
     return ()=> clearInterval(id)
   }, [nextRefresh])
@@ -89,6 +117,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
       const m = Math.floor(diff/60000)
       const s = Math.floor((diff%60000)/1000)
       setAge(`${m}:${s.toString().padStart(2,'0')}`)
+      try { localStorage.setItem('global_last_updated', String(lastUpdated)) } catch {}
     }, 1000)
     return ()=> clearInterval(id)
   }, [lastUpdated])
@@ -252,7 +281,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
     <div>
       {/* Toolbar */}
   <div className="flex flex-wrap gap-3 mb-4 items-center">
-        <div className="search-container flex-1 min-w-[220px]" style={{display:'flex',flexDirection:'column'}}>
+  <div className="search-container flex-1 min-w-[220px]" style={{display:'flex',alignItems:'center'}}>
           <div className="search-icon">🔍</div>
           <input
             type="text"
@@ -273,12 +302,12 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
           </div>
         )}
         <div className="segmented">
-          <button className={type === 'Currency' ? 'active' : ''} onClick={()=>setType('Currency')}>Currency</button>
-          <button className={type === 'Fragment' ? 'active' : ''} onClick={()=>setType('Fragment')}>Fragments</button>
+          <button className={type === 'Currency' ? 'active' : ''} onClick={()=>{ setType('Currency'); localStorage.setItem('global_currency_type','Currency') }}>Currency</button>
+          <button className={type === 'Fragment' ? 'active' : ''} onClick={()=>{ setType('Fragment'); localStorage.setItem('global_currency_type','Fragment') }}>Fragments</button>
         </div>
         <div className="segmented">
-          <button className={mode === 'buy' ? 'active' : ''} onClick={()=>setMode('buy')}>Buy</button>
-          <button className={mode === 'sell' ? 'active' : ''} onClick={()=>setMode('sell')}>Sell</button>
+          <button className={mode === 'buy' ? 'active' : ''} onClick={()=>{ setMode('buy'); localStorage.setItem('global_trade_mode','buy') }}>Buy</button>
+          <button className={mode === 'sell' ? 'active' : ''} onClick={()=>{ setMode('sell'); localStorage.setItem('global_trade_mode','sell') }}>Sell</button>
         </div>
         {showLowConfidence && (
           <div className="low-conf-warning" role="alert">⚠️ <strong>Warning:</strong> Low confidence values will likely be misleading.</div>
@@ -352,8 +381,6 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                 const listed = listedRaw >= 1000 ? `${Math.round(listedRaw/100)/10}k` : `${listedRaw}`
                 return (
                   <tr key={index}
-                    onMouseEnter={(e)=> setTooltip({ x:e.clientX+12, y:e.clientY+12, currency, spark, change7d: change||0, change24h: change24 }) }
-                    onMouseMove={(e)=> setTooltip(t=> t? { ...t, x:e.clientX+12, y:e.clientY+12 }: t)}
                     onMouseLeave={()=> setTooltip(null)}
                     onClick={()=>{
                       const slug = currency.detailsId || currency.currencyTypeName.replace(/[^a-z0-9]+/gi,'-').toLowerCase()
@@ -362,7 +389,16 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                     style={{cursor:'pointer'}}
                   >
                     <td className="sticky-col">
-                      <div className="flex items-center gap-2 justify-between" style={{width:'100%'}}>
+                      <div className="flex items-center gap-2 justify-between" style={{width:'100%', position:'relative'}}
+                        onMouseEnter={(e)=> {
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          setTooltip({ x: rect.left + 4, y: rect.top + 4, currency, spark, change7d: change||0, change24h: change24 })
+                        }}
+                        onMouseMove={(e)=> {
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          setTooltip(t=> t? { ...t, x: rect.left + 4, y: rect.top + 4 }: t)
+                        }}
+                      >
                         <div className="flex items-center gap-2">
                           {currency.icon && (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -444,7 +480,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                       </div>
                     </td>
                     <td>
-                      <Sparkline data={spark.slice(-24)} delayMs={index*35} />
+                      <Sparkline data={spark.slice(-24)} delayMs={index*25} />
                     </td>
                     <td>
                       <span style={{
@@ -483,13 +519,13 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
           </tbody>
         </table>
         {tooltip && tooltip.currency && (
-          <div className="poe-tooltip" style={{position:'fixed', left: tooltip.x, top: tooltip.y}}>
-            <h4 style={{margin:0}}>{tooltip.currency.currencyTypeName}</h4>
-            <div className="tt-line">7d Change: {tooltip.change7d>0?'+':''}{Math.round(tooltip.change7d)}%</div>
-            <div className="tt-line">~24h Change: {tooltip.change24h>0?'+':''}{Math.round(tooltip.change24h)}%</div>
-            {(() => { const ce = tooltip.currency.chaosEquivalent; if (!ce) return null; return <div className="tt-line">Chaos Eq: {ce.toFixed(2)}</div> })()}
-            {(() => { const de = tooltip.currency.divineEquivalent; if (!de) return null; return <div className="tt-line">Divine Eq: {de.toFixed(4)}</div> })()}
-            <div className="tt-line" style={{opacity:.7}}>Click for detail view</div>
+          <div className="poe-tooltip" style={{position:'fixed', left: tooltip.x, top: tooltip.y, maxWidth:220}}>
+            <h4 style={{margin:0, fontSize:13}}>{tooltip.currency.currencyTypeName}</h4>
+            <div className="tt-line" style={{color: tooltip.change7d>0? '#57d977': tooltip.change7d<0? '#ff6a6a':'#d5c186'}}>7d: {tooltip.change7d>0?'+':''}{Math.round(tooltip.change7d)}%</div>
+            <div className="tt-line" style={{color: tooltip.change24h>0? '#57d977': tooltip.change24h<0? '#ff6a6a':'#d5c186'}}>~24h: {tooltip.change24h>0?'+':''}{Math.round(tooltip.change24h)}%</div>
+            {(() => { const ce = tooltip.currency.chaosEquivalent; if (!ce) return null; return <div className="tt-line">Chaos: <strong>{ce.toFixed(2)}</strong></div> })()}
+            {(() => { const de = tooltip.currency.divineEquivalent; if (!de) return null; return <div className="tt-line">Divine: <strong>{de.toFixed(4)}</strong></div> })()}
+            <div className="tt-line" style={{opacity:.55, marginTop:4}}>Click row for details</div>
           </div>
         )}
       </div>
