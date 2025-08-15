@@ -1,8 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { AuthStatus } from "@/components/auth-status"
-import { LeagueSelector } from "@/components/league-selector"
+import { TopNav } from "@/components/top-nav"
 import { CurrencyTracker } from "@/components/currency-tracker"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { ItemOverviewTable } from "@/components/item-overview-table"
@@ -11,25 +10,24 @@ import { ItemPriceChecker } from "@/components/item-price-checker"
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"currency" | "items">("currency")
   const [realm, setRealm] = useState<'pc'|'xbox'|'sony'>('pc')
-  const [league, setLeague] = useState<string>('Mercenaries')
+  const [league, setLeague] = useState<string>('')
   const [activeSection, setActiveSection] = useState<{ key: string; label: string; type?: "Currency" | "Fragment" }>({ key: 'currency', label: 'Currency', type: 'Currency' })
 
   return (
-    <div className="container">
+    <>
+      <TopNav
+        realm={realm}
+        league={league}
+        onRealmChange={(r)=> setRealm(r)}
+        onLeagueChange={(l)=> setLeague(l)}
+      />
+      <div className="container" style={{paddingTop:'16px'}}>
       {/* Header */}
       <div className="header">
         <h1>PoE Market Tracker</h1>
         <p>Real-time currency rates and item prices for Path of Exile</p>
       </div>
-
-      {/* Auth Status and League Selector */}
-      <div className="grid grid-2 mb-6">
-    <AuthStatus />
-  <LeagueSelector
-    onRealmChange={(r)=> setRealm(r as any)}
-    onLeagueChange={(l) => setLeague(l.id)}
-  />
-      </div>
+  {/* Auth & League controls moved to TopNav */}
 
       <div className="layout-split">
         <SidebarNav
@@ -74,7 +72,8 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }
 
