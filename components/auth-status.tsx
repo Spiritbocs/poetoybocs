@@ -59,49 +59,22 @@ export function AuthStatus() {
           {isAuthenticated ? (accountName ? accountName : "Connected") : "Not Connected"}
         </div>
       </div>
-
-      <div className="mb-4">
-        <p className="text-muted">
-          {isAuthenticated
-            ? "Connected to Path of Exile API with full access"
-            : "Connect to access your account data and enhanced features"}
-        </p>
-      </div>
-
       {isAuthenticated ? (
-        <div>
-          <div className="mb-4 text-sm">
-            <div className="text-success">✓ Access to private stash tabs</div>
-            <div className="text-success">✓ Character information</div>
-            <div className="text-success">✓ Account details</div>
-            <div className="text-success">✓ Enhanced rate limits</div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="btn btn-primary"
-          >
-            🚪 Disconnect
-          </button>
-        </div>
+        <button onClick={handleLogout} className="btn btn-primary">
+          🚪 Disconnect
+        </button>
       ) : (
-        <div>
-          <div className="mb-4 text-sm text-muted">
-            Currently using public data only.
-            <br />
-            Connect for enhanced features.
-          </div>
-          <button
-            onClick={handleLogin}
-            className="btn btn-accent"
-            disabled={!envReady}
-            title={envReady ? "Authenticate with Path of Exile" : "Missing env vars: set NEXT_PUBLIC_POE_CLIENT_ID & NEXT_PUBLIC_POE_REDIRECT_URI"}
-          >
-            🔗 {envReady ? 'Connect to Path of Exile' : 'Env not configured'}
-          </button>
-          {!envReady && (
-            <p className="mt-2 text-xs text-muted">Add NEXT_PUBLIC_POE_CLIENT_ID and NEXT_PUBLIC_POE_REDIRECT_URI to .env.local then restart.</p>
-          )}
-        </div>
+        <button
+          onClick={handleLogin}
+          className="btn btn-accent"
+          disabled={!envReady}
+          title={envReady ? "Authenticate with Path of Exile" : "Environment not configured"}
+        >
+          🔗 Connect to Path of Exile
+        </button>
+      )}
+      {!isAuthenticated && !envReady && (
+        <p className="mt-2 text-xs text-muted">Set NEXT_PUBLIC_POE_CLIENT_ID & NEXT_PUBLIC_POE_REDIRECT_URI then restart.</p>
       )}
     </div>
   )
