@@ -318,7 +318,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
             <tr>
               <th className="sticky-col" style={{minWidth:240}}>Name</th>
               <th className="active-col" style={{minWidth:240}}>{mode === 'buy' ? 'Buying price' : 'Selling price'}</th>
-              <th style={{width:90}}>Last 7 days</th>
+              <th style={{width:110}}>Last 7 days</th>
               <th style={{width:70}}>Change</th>
               <th style={{width:80}}># Listed</th>
               <th style={{width:90}}>Trade</th>

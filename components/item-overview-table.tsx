@@ -102,9 +102,15 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
           </div>
         )}
       </div>
-      <div className="card-header" style={{ borderBottom: '2px solid var(--poe-border)' }}>
-        <h3 className="card-title">{title}</h3>
-        <div className="status status-connected">{filtered.length} items</div>
+      {/* Unified header style (match Currency tracker visual) */}
+      <div className="card-header" style={{ borderBottom: '2px solid var(--poe-border)', display:'flex',alignItems:'center',gap:16 }}>
+        <h3 className="card-title" style={{display:'flex',alignItems:'center',gap:8}}>
+          {title}
+          <span style={{fontSize:12,opacity:.5}}>({league} Economy)</span>
+        </h3>
+        <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:12}}>
+          <div className="status status-connected">{filtered.length} items</div>
+        </div>
       </div>
       <div className="table-container">
         <table className="table">
@@ -112,7 +118,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
             <tr>
               <th className="sticky-col" style={{minWidth:240}}>Name</th>
               <th className="active-col" style={{minWidth:240}}>Buying price</th>
-              <th style={{width:90}}>Last 7 days</th>
+              <th style={{width:110}}>Last 7 days</th>
               <th style={{width:70}}>Change</th>
               <th style={{width:80}}># Listed</th>
               <th style={{width:90}}>Trade</th>
