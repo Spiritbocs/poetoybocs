@@ -32,6 +32,7 @@ export default function ItemDetailPage() {
   const [range, setRange] = useState<'week'|'month'|'3m'>('week')
   const [listings, setListings] = useState<ListingLite[] | null>(null)
   const [listingsLoading, setListingsLoading] = useState(false)
+  const [listingsAuto, setListingsAuto] = useState(false)
 
   // Fetch overview line
   useEffect(()=>{
@@ -61,7 +62,7 @@ export default function ItemDetailPage() {
 
   // Fetch live sample listings (top 5-8) for richer info
   useEffect(()=>{
-    if (!item) return
+    if (!item || !listingsAuto) return
     let cancelled=false
     const qName = item.name || item.baseType || item.currencyTypeName
     if (!qName) return
@@ -92,7 +93,7 @@ export default function ItemDetailPage() {
       } catch { if(!cancelled) setListings([]) } finally { if(!cancelled) setListingsLoading(false) }
     })()
     return ()=>{ cancelled=true }
-  }, [item, league])
+  }, [item, league, listingsAuto])
 
   if (item === null) return <div style={{padding:32}}>Loading…</div>
   if (!item) return <div style={{padding:32}}>Item not found.</div>
@@ -222,11 +223,13 @@ export default function ItemDetailPage() {
           <div style={{background:'#161616',padding:'18px 20px 16px',border:'1px solid #2a2a2a',borderRadius:8,display:'flex',flexDirection:'column',gap:10}}>
             <div style={{display:'flex',alignItems:'center'}}>
               <div style={{fontSize:13,letterSpacing:.5,opacity:.8}}>Live Listings</div>
-              <div style={{marginLeft:'auto',fontSize:11,opacity:.45}}>{listingsLoading? 'Loading…': (listings? listings.length:0)} shown</div>
+              {!listingsAuto && <button onClick={()=>setListingsAuto(true)} style={{marginLeft:'auto',background:'#222',border:'1px solid #444',color:'#ccc',fontSize:11,padding:'4px 10px',borderRadius:4,cursor:'pointer'}}>Load</button>}
+              {listingsAuto && <div style={{marginLeft:'auto',fontSize:11,opacity:.45}}>{listingsLoading? 'Loading…': (listings? listings.length:0)} shown</div>}
             </div>
-            {!listingsLoading && (!listings || listings.length===0) && <div style={{fontSize:12,opacity:.55}}>No live sample listings found.</div>}
-            {listingsLoading && <div style={{fontSize:12,opacity:.6}}>Searching trade API…</div>}
-            {listings && listings.length>0 && (
+            {!listingsAuto && <div style={{fontSize:12,opacity:.55}}>Click Load to fetch a sample of recent listings (on-demand to save bandwidth).</div>}
+            {listingsAuto && !listingsLoading && (!listings || listings.length===0) && <div style={{fontSize:12,opacity:.55}}>No live sample listings found.</div>}
+            {listingsAuto && listingsLoading && <div style={{fontSize:12,opacity:.6}}>Searching trade API…</div>}
+            {listingsAuto && listings && listings.length>0 && (
               <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:320,overflow:'auto',paddingRight:4}}>
                 {listings.map(l=>{
                   const price = l.price ? `${l.price.amount} ${l.price.currency}` : 'n/a'
