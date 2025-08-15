@@ -15,7 +15,7 @@ export function ItemPriceChecker() {
   const [searchResults, setSearchResults] = useState<TradeItem[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedLeague, setSelectedLeague] = useState("Mercenaries")
-  const [priceSummary, setPriceSummary] = useState<{min:number; max:number; median:number; average:number; count:number; confidence:number} | null>(null)
+  const [priceSummary, setPriceSummary] = useState<{min:number; max:number; median:number; average:number; trimmedAverage:number; suggested:number; count:number; confidence:number} | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tradeSearchId, setTradeSearchId] = useState<string | null>(null)
   const [lastQuery, setLastQuery] = useState<any | null>(null)
@@ -59,7 +59,8 @@ export function ItemPriceChecker() {
         summarize(details)
       } catch (e:any) {
         console.error('Clipboard pricing failed', e)
-        setError('Pricing failed (API)')
+        const msg = (e?.message||'').includes('proxy_http_')? 'Trade API error' : 'Pricing failed (API)'
+        setError(msg)
         setSearchResults([])
         setPriceSummary(null)
       } finally { setLoading(false) }
@@ -70,13 +71,15 @@ export function ItemPriceChecker() {
 
   // Parse PoE clipboard text (approx)
   const parseClipboard = (raw: string) => {
-    const lines = raw.replace(/\r/g,'').split('\n').map(l=>l.trim()).filter(l=>l.length>0)
+    const linesFull = raw.replace(/\r/g,'').split('\n')
+    const lines = linesFull.map(l=>l.trim()).filter(l=>l.length>0)
     if (!lines.length) return null
     const obj: any = { implicits:[], explicits:[], influences:[] }
+    let rarityIdx = -1
     for (let i=0;i<lines.length;i++) {
       const line = lines[i]
       if (line.startsWith('Item Class:')) obj.itemClass = line.split(':')[1].trim()
-      else if (line.startsWith('Rarity:')) obj.rarity = line.split(':')[1].trim()
+      else if (line.startsWith('Rarity:')) { obj.rarity = line.split(':')[1].trim(); rarityIdx = i }
       else if (!obj.name && obj.rarity && obj.rarity.toLowerCase()==='rare') { obj.name = line; obj.baseType = lines[i+1]; i++ }
       else if (!obj.baseType && obj.rarity && obj.rarity.toLowerCase()!=='rare' && !line.startsWith('--------')) { obj.baseType = line }
       else if (/^Quality:/i.test(line)) { const m=line.match(/Quality:\s*\+?(\d+)/i); if (m) obj.quality=Number(m[1]) }
@@ -87,6 +90,19 @@ export function ItemPriceChecker() {
       else if (/^Sockets:/i.test(line)) { obj.sockets = line.replace(/^Sockets:\s*/i,''); obj.links = largestLinkGroup(obj.sockets) }
       else if (/Searing Exarch Item/i.test(line)) obj.influences.push('searing_exarch')
       else if (/Eater of Worlds Item/i.test(line)) obj.influences.push('eater_of_worlds')
+    }
+    // Post-process Unique name/base detection: if rarity unique and we only captured baseType (which may actually be name)
+    if (obj.rarity && obj.rarity.toLowerCase()==='unique' && rarityIdx>=0) {
+      // The two lines after rarity (before separator) are usually name then base type if they differ
+      const after = linesFull.slice(rarityIdx+1).map(l=>l.trim()).filter(l=>l && !/^[-]+$/.test(l))
+      if (after.length>=1) {
+        if (!obj.name) obj.name = after[0]
+        if (after.length>=2) {
+          const potentialBase = after[1]
+          if (!obj.baseType || obj.baseType===obj.name) obj.baseType = potentialBase
+        }
+      }
+      if (obj.name===obj.baseType) { /* some uniques have same base */ }
     }
     // Split implicits / explicits via markers '(implicit)' OR first explicit mod with + or % etc after implicit section
     const implicitIdx = lines.findIndex(l=>l.includes('(implicit)'))
@@ -121,14 +137,14 @@ export function ItemPriceChecker() {
     const rarity = (p.rarity||'').toLowerCase()
     const query:any = { query:{ status:{ option:'online' }, filters:{} as any }, sort:{ price:'asc' } }
     if (rarity==='unique') {
-      if (p.baseType) query.query.type = { option: p.baseType }
-      if (p.name && p.name!==p.baseType) query.query.name = p.name
+      if (p.name) query.query.name = p.name
+      if (p.baseType && p.baseType!==p.name) query.query.type = p.baseType
     } else if (rarity==='rare') {
       // Ignore generated rare name to broaden pool; baseType only.
       if (p.baseType) query.query.type = p.baseType
       query.query.filters.type_filters = { filters: { rarity: { option:'rare' } } }
     } else {
-      if (p.baseType) query.query.type = { option: p.baseType }
+      if (p.baseType) query.query.type = p.baseType
     }
     const miscFilters:any = {}
     if (p.quality) miscFilters.quality = { min: p.quality }
@@ -152,15 +168,27 @@ export function ItemPriceChecker() {
   const summarize = (items: TradeItem[]) => {
     const priced = items.filter(i=> i.listing.price && typeof i.listing.price.amount==='number')
     if (!priced.length) { setPriceSummary(null); return }
-    const amounts = priced.map(i=> i.listing.price!.amount).sort((a,b)=>a-b)
-    const min=amounts[0]; const max=amounts[amounts.length-1]; const median=amounts[Math.floor(amounts.length/2)]
-    const avg = amounts.reduce((a,b)=>a+b,0)/amounts.length
-    // Confidence heuristic: quantity & dispersion
-    const spread = max===0?0: (max-min)/Math.max(1, (max+min)/2)
-    const qtyScore = Math.min(1, priced.length/30)
+    const amountsRaw = priced.map(i=> i.listing.price!.amount).filter(a=>a>0)
+    if(!amountsRaw.length){ setPriceSummary(null); return }
+    const sorted = [...amountsRaw].sort((a,b)=>a-b)
+    // Trim 10% each side for >=10 samples
+    let trimmed = sorted
+    if (sorted.length>=10) {
+      const cut = Math.floor(sorted.length*0.1)
+      trimmed = sorted.slice(cut, sorted.length-cut)
+    }
+    const min = sorted[0]
+    const max = sorted[sorted.length-1]
+    const median = sorted[Math.floor(sorted.length/2)]
+    const avg = sorted.reduce((a,b)=>a+b,0)/sorted.length
+    const trimmedAvg = trimmed.reduce((a,b)=>a+b,0)/trimmed.length
+    // Suggested = median (robust), but if trimmed average within 5% of median use trimmed average (smoother)
+    const suggested = Math.abs(trimmedAvg-median)/Math.max(1,median) < 0.05 ? trimmedAvg : median
+    const spread = max===0?0: (max-min)/Math.max(1,(max+min)/2)
+    const qtyScore = Math.min(1, priced.length/40)
     const spreadScore = spread>1?0: 1-spread
-    const confidence = Math.round((0.6*qtyScore + 0.4*spreadScore)*100)
-    setPriceSummary({ min, max, median, average:avg, count:priced.length, confidence })
+    const confidence = Math.round((0.55*qtyScore + 0.45*spreadScore)*100)
+    setPriceSummary({ min, max, median, average:avg, trimmedAverage:trimmedAvg, suggested, count:priced.length, confidence })
   }
 
   const formatPrice = (price: any) => {
@@ -227,7 +255,7 @@ export function ItemPriceChecker() {
           />
           <div style={{display:'flex',gap:12,alignItems:'center'}}>
             <button onClick={handleSearch} disabled={loading || !rawClipboard.trim()} className="btn btn-accent">{loading? 'Pricing…':'Price It'}</button>
-            {priceSummary && <div style={{fontSize:12,opacity:.7}}>Listings: {priceSummary.count} • Avg: {priceSummary.average.toFixed(1)}c • Suggested List: {(priceSummary.average).toFixed(1)}c • Conf {priceSummary.confidence}%</div>}
+            {priceSummary && <div style={{fontSize:12,opacity:.7}}>Listings: {priceSummary.count} • Suggested: {priceSummary.suggested.toFixed(1)}c • Med {priceSummary.median.toFixed(1)} • Avg {priceSummary.average.toFixed(1)} • Conf {priceSummary.confidence}%</div>}
             {error && <div style={{fontSize:12,color:'#ff6a6a'}}>{error}</div>}
             {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#67bfff',textDecoration:'none'}}>Open Trade ↗</a>}
           </div>
@@ -253,10 +281,10 @@ export function ItemPriceChecker() {
                   <div><span style={{opacity:.55}}>Median</span><div style={{fontWeight:600}}>{priceSummary.median.toFixed(1)}</div></div>
                   <div><span style={{opacity:.55}}>Avg</span><div style={{fontWeight:600}}>{priceSummary.average.toFixed(1)}</div></div>
                   <div><span style={{opacity:.55}}>Max</span><div style={{fontWeight:600}}>{priceSummary.max.toFixed(1)}</div></div>
-                  <div><span style={{opacity:.55}}>Suggested</span><div style={{fontWeight:600,color:'#57d977'}}>{priceSummary.average.toFixed(1)}c</div></div>
+                  <div><span style={{opacity:.55}}>Suggested</span><div style={{fontWeight:600,color:'#57d977'}}>{priceSummary.suggested.toFixed(1)}c</div></div>
                 </div>
                 <div style={{marginLeft:'auto',fontSize:11,opacity:.5,display:'flex',gap:12,alignItems:'center'}}>
-                  <span>Heuristic • Conf {priceSummary.confidence}%</span>
+                  <span>Heuristic • Conf {priceSummary.confidence}% • Trim {priceSummary.trimmedAverage.toFixed(1)}</span>
                   {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#67bfff',textDecoration:'none'}}>Trade ↗</a>}
                 </div>
               </div>
