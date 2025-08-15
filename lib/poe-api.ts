@@ -209,6 +209,8 @@ private oauthConfig: OAuthConfig = {
     const codeVerifier = this.generateCodeVerifier()
     const codeChallenge = await this.generateCodeChallenge(codeVerifier)
     const state = Math.random().toString(36).substring(7)
+  // Determine redirect URI (env or current origin fallback for local dev)
+  const redirectUri = this.oauthConfig.redirectUri || (typeof window !== 'undefined' ? `${window.location.origin}/oauth/callback` : '')
 
     // Store PKCE data for token exchange
     if (typeof window !== "undefined") {
@@ -226,7 +228,7 @@ private oauthConfig: OAuthConfig = {
       client_id: this.oauthConfig.clientId,
       response_type: "code",
       scope: this.oauthConfig.scopes.join(" "),
-      redirect_uri: this.oauthConfig.redirectUri,
+      redirect_uri: redirectUri,
       state: state,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",

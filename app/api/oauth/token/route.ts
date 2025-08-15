@@ -3,11 +3,12 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { code, state, codeVerifier } = body
 
+    const envRedirect = process.env.NEXT_PUBLIC_POE_REDIRECT_URI || ""
     console.log("Token exchange request:", {
       code: code?.substring(0, 10) + "...",
       state,
       codeVerifier: codeVerifier?.substring(0, 10) + "...",
-      redirect_uri: "https://poetoybocs.vercel.app/oauth/callback",
+      redirect_uri: envRedirect,
     })
 
     const tokenResponse = await fetch("https://www.pathofexile.com/oauth/token", {
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
         client_id: process.env.NEXT_PUBLIC_POE_CLIENT_ID || "",
         client_secret: process.env.POE_CLIENT_SECRET || "",
         code: code,
-        redirect_uri: process.env.NEXT_PUBLIC_POE_REDIRECT_URI || "",
+  redirect_uri: envRedirect,
         code_verifier: codeVerifier,
         scope: "account:profile",
       }),
