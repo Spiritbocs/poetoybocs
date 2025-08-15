@@ -72,9 +72,9 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
   return (
     <nav style={{position:'sticky',top:0,zIndex:50,background:'#111',borderBottom:'1px solid #222',padding:'8px 16px',display:'flex',alignItems:'center',gap:24}}>
       {/* Brand */}
-      <div style={{fontWeight:700,fontSize:'1rem',letterSpacing:'.5px',display:'flex',alignItems:'center',gap:8}}>
-        <span style={{color:'var(--poe-gold, #c8aa6e)'}}>PoE</span>
-        <span style={{opacity:.8}}>Market Tracker</span>
+      <div style={{fontWeight:700,fontSize:'1rem',letterSpacing:'.5px',display:'flex',alignItems:'center',gap:6}}>
+        <span style={{color:'var(--poe-gold, #c8aa6e)'}}>Spiritbocs</span>
+        <span style={{opacity:.65}}>Tracker</span>
       </div>
       {/* Center optional future nav links */}
       <div style={{flex:1}} />

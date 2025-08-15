@@ -128,19 +128,17 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
 
   // Small badge component for countdown & age
   const Badge: React.FC<{ label: string; value: string; tooltip?: string; kind: 'next'|'age'; ageValue?: string | null }> = ({ label, value, tooltip, kind, ageValue }) => {
-    // Determine color style based on age for kind==='age'
-    let bg = 'var(--poe-gold,#c8aa6e)'
     let color = '#b30000'
     if (kind === 'age' && ageValue) {
       const [mStr] = ageValue.split(':')
       const m = parseInt(mStr,10)||0
-      if (m < 3) { bg = 'var(--poe-gold,#c8aa6e)'; color = '#063b00' } // greenish text alt for readability
-      else if (m < 6) { bg = '#c8aa6e'; color = '#7a3f00' }
-      else { bg = '#c8aa6e'; color = '#b30000' }
+      if (m < 3) { color = '#4caf50' }
+      else if (m < 6) { color = '#ff9800' }
+      else { color = '#f44336' }
     }
     return (
-      <div title={tooltip} style={{background:bg,color, fontSize:11,fontWeight:700,padding:'2px 6px',borderRadius:4,letterSpacing:'.5px',display:'flex',alignItems:'center',gap:4}}>
-        <span style={{opacity:.7}}>{label}:</span><span>{value}</span>
+      <div title={tooltip} style={{ fontSize:11,fontWeight:600,letterSpacing:'.5px',display:'flex',alignItems:'center',gap:2, color }}>
+        <span style={{opacity:.55}}>{label}:</span><span>{value}</span>
       </div>
     )
   }
@@ -245,10 +243,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
           />
-          <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:4}}>
-            <Badge label="Next" value={countdown || '--:--'} tooltip={`Scheduled refresh every ${REFRESH_INTERVAL_MS/60000} minutes`} kind="next" />
-            <Badge label="Age" value={age || '0:00'} tooltip="Time since last successful data fetch" kind="age" ageValue={age} />
-          </div>
+          {/* Timers moved to header; keep placeholder spacing */}
         </div>
         {divineChaos && chaosIcon && divineIcon && (
           <div className="conversion-pill" title="Divine to Chaos ratio">
@@ -309,9 +304,19 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
       </div>
 
       {/* Currency Table */}
-      <div className="card-header" style={{ borderBottom: "2px solid var(--poe-border)" }}>
-        <h3 className="card-title">📈 {selectedLeague} Economy</h3>
-  <div className="status status-connected">{filteredData.length} items</div>
+      <div className="card-header" style={{ borderBottom: "2px solid var(--poe-border)", display:'flex',alignItems:'center',gap:16 }}>
+        <h3 className="card-title" style={{display:'flex',alignItems:'center',gap:8}}>
+          📈 Spiritbocs Tracker
+          <span style={{fontSize:12,opacity:.5}}>({selectedLeague} Economy)</span>
+        </h3>
+        <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <Badge label="Next" value={countdown || '--:--'} tooltip={`Next scheduled refresh (every ${REFRESH_INTERVAL_MS/60000}m)`} kind="next" />
+            <Badge label="Age" value={age || '0:00'} tooltip="Data age" kind="age" ageValue={age} />
+            <span style={{cursor:'help',fontSize:14}} title={`Next = time until auto refresh. Age = time since last fetch. Interval ${REFRESH_INTERVAL_MS/60000} minutes.`}>ℹ️</span>
+          </div>
+          <div className="status status-connected">{filteredData.length} items</div>
+        </div>
       </div>
 
       <div className="table-container">

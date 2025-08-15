@@ -7,11 +7,7 @@ export const metadata: Metadata = {
   generator: 'vsCode.app',
 }
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
@@ -23,7 +19,14 @@ html {
 }
   `}</style>
       </head>
-      <body>{children}</body>
+      <body style={{minHeight:'100vh',display:'flex',flexDirection:'column'}}>
+        <div style={{flex:1}}>
+          {children}
+        </div>
+        <footer style={{padding:'16px 24px',fontSize:12,display:'flex',justifyContent:'center',borderTop:'1px solid #222',background:'#111',color:'#aaa'}}>
+          <span style={{opacity:.9}}>Spiritbocs© 2025 — Not affiliated with Grinding Gear Games</span>
+        </footer>
+      </body>
     </html>
   )
 }
