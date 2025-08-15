@@ -131,6 +131,33 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
   const buildWikiUrl = (name: string) => `https://www.poewiki.net/wiki/${encodeURIComponent(name.replace(/ /g, "_"))}`
   const approx = (n?: number) => (n ? `~${n}` : "~0")
 
+  // Mapping poe.ninja detailsId -> PoE trade exchange slugs
+  const tradeSlugMap: Record<string,string> = {
+    'chaos-orb':'chaos',
+    'divine-orb':'divine',
+    'mirror-of-kalandra':'mirror',
+    'exalted-orb':'exalted',
+    'orb-of-annulment':'annulment',
+    'orb-of-alchemy':'alchemy',
+    'orb-of-chance':'chance',
+    'vaal-orb':'vaal',
+    'regal-orb':'regal',
+    'orb-of-fusing':'fusing',
+    'orb-of-scouring':'scouring',
+    'orb-of-regret':'regret',
+    'engineers-orb':'engineers',
+    'blessed-orb':'blessed',
+    'orb-of-binding':'binding',
+    'orb-of-dominance':'dominance',
+    'fracturing-orb':'fracturing',
+    'hinekora-s-lock':'hinekora-s-lock',
+  }
+  const getTradeSlug = (c: CurrencyData) => tradeSlugMap[c.detailsId] || c.detailsId.replace(/[^a-z0-9]+/gi,'-').toLowerCase()
+  const buildExchangeUrl = (league: string, have: string, want: string) => {
+    const query = { exchange: { status: { option: 'online' }, have: [have], want: [want] } }
+    return `https://www.pathofexile.com/trade/exchange/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(query))}`
+  }
+
   // Small badge component for countdown & age
   const Badge: React.FC<{ label: string; value: string; tooltip?: string; kind: 'next'|'age'; ageValue?: string | null }> = ({ label, value, tooltip, kind, ageValue }) => {
     let color = '#b30000'
@@ -440,7 +467,16 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                       return listedRaw >= 1000 ? `${Math.round(listedRaw/100)/10}k` : `${listedRaw}`
                     })()}</td>
                     <td>
-                      <TradeMenu currency={currency} />
+                      {(() => {
+                        const slug = getTradeSlug(currency)
+                        // Skip if slug is chaos (trading chaos for chaos pointless)
+                        if (slug === 'chaos') return null
+                        const have = mode === 'buy' ? 'chaos' : slug
+                        const want = mode === 'buy' ? slug : 'chaos'
+                        const url = buildExchangeUrl(selectedLeague, have, want)
+                        const tooltip = `${mode === 'buy' ? 'Buy' : 'Sell'} via pathofexile.com (${have} -> ${want})`
+                        return <a href={url} target="_blank" rel="noopener noreferrer" className="trade-btn" title={tooltip}>Trade ↗</a>
+                      })()}
                     </td>
                   </tr>
                 )
