@@ -1,7 +1,7 @@
 // Converted to hybrid: server loader (RSC) + client detail component.
 import { candidateTitlesForSlug, slugifyName } from '@/lib/name-aliases'
 import { poeApi } from '@/lib/poe-api'
-import ItemDetailClient from './client.js'
+import ItemDetailClient from './client'
 
 export const dynamic = 'force-dynamic'
 
