@@ -1,53 +1,32 @@
-import { NextResponse } from "next/server"
+// Proxy route for poe.ninja currencyoverview with short server cache (single implementation)
+export const dynamic = 'force-dynamic'
+import { NextResponse } from 'next/server'
 
-// Simple in-memory cache (per server instance)
-interface CacheEntry { data: any; timestamp: number }
-const CACHE_TTL_MS = 2 * 60 * 1000 // 2 minutes
-const globalCache: Map<string, CacheEntry> = (globalThis as any).__NINJA_CACHE__ || new Map()
-;(globalThis as any).__NINJA_CACHE__ = globalCache
+interface CacheEntry { data: any; ts: number }
+const CACHE_TTL_MS = 45 * 1000
+const cache: Map<string, CacheEntry> = (globalThis as any).__NINJA_CURR_CACHE__ || new Map()
+;(globalThis as any).__NINJA_CURR_CACHE__ = cache
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const league = searchParams.get("league") || "Mercenaries"
-  const type = searchParams.get("type") || "Currency"
-  const cacheKey = `${league}:${type}`
-
-  const cached = globalCache.get(cacheKey)
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return NextResponse.json(cached.data, { headers: corsHeaders() })
+  const league = searchParams.get('league') || 'Mercenaries'
+  const type = searchParams.get('type') || 'Currency'
+  const key = `${league}:${type}`
+  const now = Date.now()
+  const cached = cache.get(key)
+  if (cached && now - cached.ts < CACHE_TTL_MS) {
+    return NextResponse.json({ ...cached.data, _cached: true, _cachedAt: cached.ts })
   }
-
-  const upstreamUrl = `https://poe.ninja/api/data/currencyoverview?league=${encodeURIComponent(league)}&type=${encodeURIComponent(type)}`
-
+  const upstream = `https://poe.ninja/api/data/currencyoverview?league=${encodeURIComponent(league)}&type=${encodeURIComponent(type)}&language=en`
   try {
-    const res = await fetch(upstreamUrl, {
-      headers: { "User-Agent": "poetoybocs/1.0 (+github)" },
-      next: { revalidate: CACHE_TTL_MS / 1000 },
-    })
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: `Upstream error ${res.status}` },
-        { status: res.status, headers: corsHeaders() },
-      )
-    }
-    const data = await res.json()
-    globalCache.set(cacheKey, { data, timestamp: Date.now() })
-    return NextResponse.json(data, { headers: corsHeaders() })
-  } catch (err: any) {
-    return NextResponse.json(
-      { error: err?.message || "Fetch failed" },
-      { status: 500, headers: corsHeaders() },
-    )
+    const res = await fetch(upstream, { headers: { 'User-Agent': 'poetoybocs/1.0 (+currency)' }, cache: 'no-store' })
+    if (!res.ok) return NextResponse.json({ error: 'upstream_error', status: res.status }, { status: 502 })
+    const json = await res.json()
+    cache.set(key, { data: json, ts: now })
+    return NextResponse.json({ ...json, _fetchedAt: now })
+  } catch (e:any) {
+    return NextResponse.json({ error: 'fetch_failed', message: e?.message }, { status: 500 })
   }
 }
 
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-  }
-}
-
-export function OPTIONS() {
-  return new NextResponse(null, { headers: corsHeaders() })
-}
+export function OPTIONS() { return new NextResponse(null) }

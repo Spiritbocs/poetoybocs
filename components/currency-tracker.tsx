@@ -13,6 +13,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
   const [selectedLeague, setSelectedLeague] = useState(league)
   const [type, setType] = useState<"Currency" | "Fragment">(initialType || "Currency")
   const [mode, setMode] = useState<"buy" | "sell">("buy")
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null)
   const [showLowConfidence, setShowLowConfidence] = useState(false)
   // respond to initialType changes (sidebar navigation)
   useEffect(() => { if (initialType && initialType !== type) setType(initialType) }, [initialType])
@@ -22,30 +23,36 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
 
   // Fetch data when league or type changes
   useEffect(() => {
-    async function fetchCurrencyData() {
-      setLoading(true)
+    if (!selectedLeague) return
+    let abort = false
+    async function fetchCurrencyData(realTime = false) {
+      setLoading(prev => prev && !realTime) // keep spinner only for first full load
       try {
-  const data = await poeApi.getCurrencyData(selectedLeague, type, realm)
+        const data = await poeApi.getCurrencyData(selectedLeague, type, realm)
+        if (abort) return
         setCurrencyData(data)
         setFilteredData(data)
-  const chaosEntry = data.find((d) => d.detailsId === "chaos-orb")
-  const divineEntry = data.find((d) => d.detailsId === "divine-orb")
-  const chaos = chaosEntry?.icon || null
-  const divine = divineEntry?.icon || null
+        const chaosEntry = data.find((d) => d.detailsId === "chaos-orb")
+        const divineEntry = data.find((d) => d.detailsId === "divine-orb")
+        const chaos = chaosEntry?.icon || null
+        const divine = divineEntry?.icon || null
         setChaosIcon(chaos)
         setDivineIcon(divine)
-  if (divineEntry?.chaosEquivalent) setDivineChaos(divineEntry.chaosEquivalent)
+        if (divineEntry?.chaosEquivalent) setDivineChaos(divineEntry.chaosEquivalent)
+        setLastUpdated(Date.now())
       } catch (error) {
-        console.error("Failed to fetch currency data:", error)
-        setCurrencyData([])
-        setFilteredData([])
+        if (!abort) {
+          console.error("Failed to fetch currency data:", error)
+          setCurrencyData([])
+          setFilteredData([])
+        }
       } finally {
-        setLoading(false)
+        if (!abort) setLoading(false)
       }
     }
     fetchCurrencyData()
-    const interval = setInterval(fetchCurrencyData, 5 * 60 * 1000)
-    return () => clearInterval(interval)
+    const interval = setInterval(()=>fetchCurrencyData(true), 60 * 1000) // 60s real-time refresh
+    return () => { abort = true; clearInterval(interval) }
   }, [selectedLeague, type, realm])
 
   // Sync prop -> internal league
@@ -180,7 +187,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
   return (
     <div>
       {/* Toolbar */}
-      <div className="flex flex-wrap gap-3 mb-4 items-center">
+  <div className="flex flex-wrap gap-3 mb-4 items-center">
         <div className="search-container flex-1 min-w-[220px]">
           <div className="search-icon">🔍</div>
           <input
@@ -210,6 +217,31 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
         </div>
         {showLowConfidence && (
           <div className="low-conf-warning" role="alert">⚠️ <strong>Warning:</strong> Low confidence values will likely be misleading.</div>
+        )}
+        <button
+          className="btn btn-sm"
+          onClick={()=> {
+            // Force an immediate fresh pull bypassing initial loading spinner
+            setLastUpdated(null)
+            // Use a temporary mode flip to trigger effect indirectly if desired; simplest is direct call path via helper
+            ;(async()=>{
+              try {
+                const data = await poeApi.getCurrencyData(selectedLeague, type, realm)
+                setCurrencyData(data); setFilteredData(data)
+                const chaosEntry = data.find(d=>d.detailsId==='chaos-orb')
+                const divineEntry = data.find(d=>d.detailsId==='divine-orb')
+                setChaosIcon(chaosEntry?.icon||null)
+                setDivineIcon(divineEntry?.icon||null)
+                if (divineEntry?.chaosEquivalent) setDivineChaos(divineEntry.chaosEquivalent)
+                setLastUpdated(Date.now())
+              } catch {/* ignore */}
+            })()
+          }}
+          title="Manual refresh (bypasses 60s interval)"
+          style={{background:'#222'}}
+        >Refresh</button>
+        {lastUpdated && (
+          <div style={{fontSize:11,opacity:.65}}>Updated {new Date(lastUpdated).toLocaleTimeString()}</div>
         )}
         <div className="toggle-wrapper low-conf-toggle">
           <label className="toggle-label">

@@ -554,10 +554,7 @@ private oauthConfig: OAuthConfig = {
   }
 
   async getCurrencyData(league: string, type: 'Currency' | 'Fragment' = 'Currency', realm: string = 'pc'): Promise<CurrencyData[]> {
-    const cacheKey = `currency-${realm}-${league}-${type}`
-    const cached = this.getCachedData<CurrencyData[]>(cacheKey)
-    if (cached) return cached
-
+  // Real-time mode: bypass long-lived cache (poe.ninja updates ~1-5m). We rely on server proxy short TTL (45s).
     try {
       // Use internal proxy route to avoid CORS / client direct external issues
       const response = await fetch(
@@ -600,7 +597,6 @@ private oauthConfig: OAuthConfig = {
         }
       })
 
-      this.setCachedData(cacheKey, currencyData)
       return currencyData
     } catch (error) {
   console.error("Error fetching currency data:", error)

@@ -21,13 +21,8 @@ export default function HomePage() {
         onRealmChange={(r)=> setRealm(r)}
         onLeagueChange={(l)=> setLeague(l)}
       />
-      <div className="container" style={{paddingTop:'16px'}}>
-      {/* Header */}
-      <div className="header">
-        <h1>PoE Market Tracker</h1>
-        <p>Real-time currency rates and item prices for Path of Exile</p>
-      </div>
-  {/* Auth & League controls moved to TopNav */}
+    <div className="container" style={{paddingTop:'16px'}}>
+  {/* Header removed per request; content condenses upward */}
 
       <div className="layout-split">
         <SidebarNav
