@@ -354,6 +354,19 @@ body {
 .price-grid .wiki-badge { margin-right:4px; }
 .price-grid .num { font-variant-numeric: tabular-nums; font-weight:600; }
 
+/* Top navigation select styling (force dark dropdown) */
+.top-nav select {
+  background:linear-gradient(#2a2a2a,#202020);
+  color:#e4e4e4;
+}
+.top-nav select:focus { outline:1px solid #b58235; box-shadow:0 0 0 2px rgba(181,130,53,.35); }
+/* Firefox */
+.top-nav select option { background:#1e1e1e; color:#e4e4e4; }
+/* Some browsers (Chromium) ignore option backgrounds if not explicitly set */
+@supports (-webkit-appearance: none) {
+  .top-nav select option { background:#1e1e1e; }
+}
+
 /* Conversion pill */
 .conversion-pill { display:flex; align-items:center; gap:6px; background:var(--poe-bg-secondary); border:1px solid var(--poe-border); padding:4px 10px; border-radius:20px; font-size:12px; }
 .conversion-pill img { width:16px; height:16px; }

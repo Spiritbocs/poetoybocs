@@ -70,7 +70,7 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
   }
 
   return (
-    <nav style={{position:'sticky',top:0,zIndex:50,background:'linear-gradient(90deg,#121212,#181818 40%,#1d1a14 95%)',borderBottom:'1px solid #2a2a2a',padding:'8px 16px',display:'flex',alignItems:'center',gap:24,backdropFilter:'blur(6px)'}}>
+    <nav className="top-nav" style={{position:'sticky',top:0,zIndex:50,background:'linear-gradient(90deg,#121212,#181818 40%,#1d1a14 95%)',borderBottom:'1px solid #2a2a2a',padding:'8px 16px',display:'flex',alignItems:'center',gap:24,backdropFilter:'blur(6px)'}}>
       {/* Brand */}
       <div style={{fontWeight:700,fontSize:'1rem',letterSpacing:'.5px',display:'flex',alignItems:'center',gap:6}}>
         <span style={{color:'var(--poe-gold, #c8aa6e)'}}>Spiritbocs</span>
