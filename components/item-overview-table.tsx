@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react'
 import { poeApi } from '@/lib/poe-api'
+import { Sparkline } from './sparkline'
 
 // Stable fallback icon for Chaos Orb (same as currency tracker)
 const CHAOS_ICON_FALLBACK = "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lSZXJvbGxSYXJlIiwidyI6MSwiaCI6MSwic2NhbGUiOjF9XQ/d119a0d734/CurrencyRerollRare.png"
@@ -53,21 +54,54 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
     return v < 0.1 ? v.toFixed(3) : v.toFixed(2)
   }
 
-  // Build PoE trade search URL for arbitrary item lines (uniques, fossils, etc.)
-  function buildItemTradeUrl(line: any): string | null {
-    // Skip chaos orb (handled on currency tab)
-    const nm = (line.name || line.currencyTypeName || '').toLowerCase()
-    if (nm === 'chaos orb') return null
+  // Build PoE trade search query body for API POST (returns hash id for /trade/search/{league}/{id})
+  function buildItemTradeQuery(line: any): any | null {
+    const nmLower = (line.name || line.currencyTypeName || '').toLowerCase()
+    if (nmLower === 'chaos orb') return null // handled on currency tab
     const query: any = { query: { status: { option: 'online' } }, sort: { price: 'asc' } }
-    const name = line.name && line.name.trim() ? line.name : null
-    const base = line.baseType && line.baseType.trim() && line.baseType !== line.name ? line.baseType : null
-    const ctn = line.currencyTypeName && line.currencyTypeName.trim() ? line.currencyTypeName : null
-    if (name && base) { query.query.name = name; query.query.type = base }
-    else if (name) { query.query.name = name }
-    else if (base) { query.query.type = base }
-    else if (ctn) { query.query.name = ctn }
-    else return null
-    return `https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(query))}`
+    const rawName = line.name && line.name.trim() ? line.name.trim() : ''
+    const rawBase = line.baseType && line.baseType.trim() ? line.baseType.trim() : ''
+    // Many poe.ninja lines use baseType for generic groups (e.g. Fossil, Scarab), keep name if unique-like (has spaces and capitalised words)
+    if (rawName && rawBase && rawName !== rawBase) {
+      query.query.name = rawName
+      query.query.type = rawBase
+    } else if (rawName) {
+      query.query.name = rawName
+    } else if (rawBase) {
+      query.query.type = rawBase
+    } else if (line.currencyTypeName) {
+      query.query.name = line.currencyTypeName
+    } else {
+      return null
+    }
+    return query
+  }
+  async function openTrade(line: any, btn: HTMLButtonElement) {
+    const query = buildItemTradeQuery(line)
+    if (!query) return
+    const original = btn.textContent
+    btn.textContent = '…'
+    btn.disabled = true
+    try {
+      const res = await fetch(`https://www.pathofexile.com/api/trade/search/${encodeURIComponent(league)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(query)
+      })
+      if (!res.ok) throw new Error('search_failed')
+      const json = await res.json()
+      if (json?.id) {
+        const url = `https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}/${json.id}`
+        window.open(url, '_blank', 'noopener,noreferrer')
+      }
+    } catch (e) {
+      console.warn('Trade search failed', e)
+      btn.textContent = 'x'
+      setTimeout(()=>{ btn.textContent = original || '↗'; btn.disabled = false }, 1200)
+      return
+    }
+    btn.textContent = original || '↗'
+    btn.disabled = false
   }
 
   if (loading) return <div className="loading"><div className="spinner"/>Loading {title}...</div>
@@ -164,10 +198,10 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
                       })()}
                     </div>
                   </td>
-                  <td><Spark data={spark.slice(-24)} /></td>
+                  <td><Sparkline data={spark.slice(-24)} changeHint={change} /></td>
                   <td className={getTrendColor(change)} title={change !== undefined ? `${change.toFixed(2)}%` : '0%'}>{formatChange(change)}</td>
                   <td title={`Approximate listings: ${listed}`}>~{listed >=1000? `${Math.round(listed/100)/10}k`: listed}</td>
-                  <td>{(() => { const url = buildItemTradeUrl(l); return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="trade-icon-btn" title="Open trade in new tab">↗</a> : null })()}</td>
+                  <td>{(() => { const q = buildItemTradeQuery(l); return q ? <button className="trade-icon-btn" title="Open trade search" onClick={(e)=>openTrade(l, e.currentTarget)}>↗</button> : null })()}</td>
                 </tr>
               )
             })}
@@ -178,19 +212,4 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
   )
 }
 
-function Spark({ data }: { data?: number[] }) {
-  if (!data || data.length < 2) return <div style={{height:24}} />
-  const max = Math.max(...data)
-  const min = Math.min(...data)
-  const range = max - min || 1
-  const points = data.map((v,i)=>{
-    const x = (i/(data.length-1))*60
-    const y = 24 - ((v-min)/range)*24
-    return `${x},${y}`
-  }).join(' ')
-  return (
-    <svg width={60} height={24} viewBox="0 0 60 24" preserveAspectRatio="none">
-      <polyline fill="none" stroke="var(--poe-gold,#c8a252)" strokeWidth={2} points={points} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
+// (Legacy Spark component removed; using shared Sparkline)

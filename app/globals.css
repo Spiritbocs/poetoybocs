@@ -354,6 +354,11 @@ body {
 .price-grid .wiki-badge { margin-right:4px; }
 .price-grid .num { font-variant-numeric: tabular-nums; font-weight:600; }
 
+/* Enhanced sparkline */
+.sparkline-box { position:relative; display:inline-flex; }
+.sparkline-bg { fill:rgba(255,255,255,0.03); stroke:rgba(255,255,255,0.08); }
+.sparkline-box svg { display:block; }
+
 /* Top navigation select styling (force dark dropdown) */
 .top-nav select {
   background:linear-gradient(#2a2a2a,#202020);

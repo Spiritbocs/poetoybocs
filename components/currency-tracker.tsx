@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Sparkline } from "./sparkline"
 import { poeApi, type CurrencyData } from "@/lib/poe-api"
 
 // Stable fallback icon for Chaos Orb supplied by user (poe.ninja / PoE CDN style)
@@ -233,31 +234,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
     )
   }
 
-  const Sparkline: React.FC<{ data?: number[] }> = ({ data }) => {
-    if (!data || data.length < 2) return <div style={{ height: 24 }} />
-    const max = Math.max(...data)
-    const min = Math.min(...data)
-    const range = max - min || 1
-    const points = data
-      .map((v, i) => {
-        const x = (i / (data.length - 1)) * 60
-        const y = 24 - ((v - min) / range) * 24
-        return `${x},${y}`
-      })
-      .join(" ")
-    return (
-      <svg width={60} height={24} viewBox="0 0 60 24" preserveAspectRatio="none">
-        <polyline
-          fill="none"
-          stroke="var(--poe-gold, #c8a252)"
-          strokeWidth={2}
-          points={points}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    )
-  }
+  // (Old inline Sparkline removed in favor of shared component)
 
   if (loading) {
     return (
