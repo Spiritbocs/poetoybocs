@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react"
 import { poeApi, type CurrencyData } from "@/lib/poe-api"
 
+// Stable fallback icon for Chaos Orb supplied by user (poe.ninja / PoE CDN style)
+const CHAOS_ICON_FALLBACK = "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lSZXJvbGxSYXJlIiwidyI6MSwiaCI6MSwic2NhbGUiOjF9XQ/d119a0d734/CurrencyRerollRare.png"
+
 interface CurrencyTrackerProps { league: string; realm?: string; initialType?: "Currency" | "Fragment" }
 
 export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyTrackerProps) {
@@ -39,8 +42,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
   const chaosEntry = data.find(d=>d.detailsId==='chaos-orb')
   const divineEntry = data.find(d=>d.detailsId==='divine-orb')
   // Always keep or set a chaos icon so chain never appears without it
-  const fallbackChaos = 'https://www.poewiki.net/images/5/5a/Chaos_Orb_inventory_icon.png'
-  setChaosIcon(prev => chaosEntry?.icon || prev || fallbackChaos)
+  setChaosIcon(prev => chaosEntry?.icon || prev || CHAOS_ICON_FALLBACK)
   // Only update divine icon if present to avoid clearing between tab switches
   if (divineEntry?.icon) setDivineIcon(divineEntry.icon)
         if (divineEntry?.chaosEquivalent) setDivineChaos(divineEntry.chaosEquivalent)
@@ -381,7 +383,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                                 )}
                                 <div className="grp chaos-group" title="Chaos equivalent">
                                   <span className="num">{formatShort(chaosEq)}</span>
-                                  {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" />}
+                                  {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" onError={(e)=>{ if (e.currentTarget.src!==CHAOS_ICON_FALLBACK) e.currentTarget.src=CHAOS_ICON_FALLBACK }} />}
                                 </div>
                                 <div className="arrow">→</div>
                                 <div className="grp target-group" title="Unit price">
@@ -400,7 +402,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                                 <div className="arrow">→</div>
                                 <div className="grp chaos-group" title="Chaos equivalent">
                                   <span className="num">{formatShort(chaosEq)}</span>
-                                  {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" />}
+                                  {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" onError={(e)=>{ if (e.currentTarget.src!==CHAOS_ICON_FALLBACK) e.currentTarget.src=CHAOS_ICON_FALLBACK }} />}
                                 </div>
                                 {showDiv && (
                                   <>
