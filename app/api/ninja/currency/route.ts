@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 
 interface CacheEntry { data: any; ts: number }
-const CACHE_TTL_MS = 45 * 1000
+// Standardize to 60s TTL. Note: On Vercel serverless, in-memory cache may be cold per invocation.
+const CACHE_TTL_MS = 60 * 1000
 const cache: Map<string, CacheEntry> = (globalThis as any).__NINJA_CURR_CACHE__ || new Map()
 ;(globalThis as any).__NINJA_CURR_CACHE__ = cache
 

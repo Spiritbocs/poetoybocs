@@ -14,6 +14,11 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
   const [type, setType] = useState<"Currency" | "Fragment">(initialType || "Currency")
   const [mode, setMode] = useState<"buy" | "sell">("buy")
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
+  // Real-time (10 min) refresh handling
+  const REFRESH_INTERVAL_MS = 3 * 60 * 1000 // 3-minute client refresh cadence
+  const [nextRefresh, setNextRefresh] = useState<number | null>(null)
+  const [countdown, setCountdown] = useState<string>("")
+  const [age, setAge] = useState<string>("")
   const [showLowConfidence, setShowLowConfidence] = useState(false)
   // respond to initialType changes (sidebar navigation)
   useEffect(() => { if (initialType && initialType !== type) setType(initialType) }, [initialType])
@@ -26,34 +31,58 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
     if (!selectedLeague) return
     let abort = false
     async function fetchCurrencyData(realTime = false) {
-      setLoading(prev => prev && !realTime) // keep spinner only for first full load
+      setLoading(prev => prev && !realTime)
       try {
         const data = await poeApi.getCurrencyData(selectedLeague, type, realm)
         if (abort) return
-        setCurrencyData(data)
-        setFilteredData(data)
-        const chaosEntry = data.find((d) => d.detailsId === "chaos-orb")
-        const divineEntry = data.find((d) => d.detailsId === "divine-orb")
-        const chaos = chaosEntry?.icon || null
-        const divine = divineEntry?.icon || null
-        setChaosIcon(chaos)
-        setDivineIcon(divine)
+        setCurrencyData(data); setFilteredData(data)
+        const chaosEntry = data.find(d=>d.detailsId==='chaos-orb')
+        const divineEntry = data.find(d=>d.detailsId==='divine-orb')
+        setChaosIcon(chaosEntry?.icon||null)
+        setDivineIcon(divineEntry?.icon||null)
         if (divineEntry?.chaosEquivalent) setDivineChaos(divineEntry.chaosEquivalent)
-        setLastUpdated(Date.now())
+        const now = Date.now()
+        setLastUpdated(now)
+        setNextRefresh(now + REFRESH_INTERVAL_MS)
       } catch (error) {
         if (!abort) {
           console.error("Failed to fetch currency data:", error)
-          setCurrencyData([])
-          setFilteredData([])
+          setCurrencyData([]); setFilteredData([])
         }
-      } finally {
-        if (!abort) setLoading(false)
-      }
+      } finally { if (!abort) setLoading(false) }
     }
     fetchCurrencyData()
-    const interval = setInterval(()=>fetchCurrencyData(true), 60 * 1000) // 60s real-time refresh
-    return () => { abort = true; clearInterval(interval) }
+    const interval = setInterval(()=>fetchCurrencyData(true), REFRESH_INTERVAL_MS)
+    return ()=>{ abort = true; clearInterval(interval) }
   }, [selectedLeague, type, realm])
+
+  // Countdown display for next scheduled refresh
+  useEffect(()=>{
+    if (!nextRefresh) { setCountdown(""); return }
+    const id = setInterval(()=>{
+      const diff = nextRefresh - Date.now()
+      if (diff <= 0) {
+        setCountdown("Refreshing…")
+        return
+      }
+      const m = Math.floor(diff/60000)
+      const s = Math.floor((diff%60000)/1000)
+      setCountdown(`${m}:${s.toString().padStart(2,'0')}`)
+    }, 1000)
+    return ()=> clearInterval(id)
+  }, [nextRefresh])
+
+  // Age badge (time since last update) separate from countdown
+  useEffect(()=>{
+    if (!lastUpdated) { setAge(""); return }
+    const id = setInterval(()=>{
+      const diff = Date.now() - lastUpdated
+      const m = Math.floor(diff/60000)
+      const s = Math.floor((diff%60000)/1000)
+      setAge(`${m}:${s.toString().padStart(2,'0')}`)
+    }, 1000)
+    return ()=> clearInterval(id)
+  }, [lastUpdated])
 
   // Sync prop -> internal league
   useEffect(() => {
@@ -96,6 +125,25 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
 
   const buildWikiUrl = (name: string) => `https://www.poewiki.net/wiki/${encodeURIComponent(name.replace(/ /g, "_"))}`
   const approx = (n?: number) => (n ? `~${n}` : "~0")
+
+  // Small badge component for countdown & age
+  const Badge: React.FC<{ label: string; value: string; tooltip?: string; kind: 'next'|'age'; ageValue?: string | null }> = ({ label, value, tooltip, kind, ageValue }) => {
+    // Determine color style based on age for kind==='age'
+    let bg = 'var(--poe-gold,#c8aa6e)'
+    let color = '#b30000'
+    if (kind === 'age' && ageValue) {
+      const [mStr] = ageValue.split(':')
+      const m = parseInt(mStr,10)||0
+      if (m < 3) { bg = 'var(--poe-gold,#c8aa6e)'; color = '#063b00' } // greenish text alt for readability
+      else if (m < 6) { bg = '#c8aa6e'; color = '#7a3f00' }
+      else { bg = '#c8aa6e'; color = '#b30000' }
+    }
+    return (
+      <div title={tooltip} style={{background:bg,color, fontSize:11,fontWeight:700,padding:'2px 6px',borderRadius:4,letterSpacing:'.5px',display:'flex',alignItems:'center',gap:4}}>
+        <span style={{opacity:.7}}>{label}:</span><span>{value}</span>
+      </div>
+    )
+  }
 
   const TradeMenu: React.FC<{ currency: CurrencyData }> = ({ currency }) => {
     const [open, setOpen] = useState(false)
@@ -188,7 +236,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
     <div>
       {/* Toolbar */}
   <div className="flex flex-wrap gap-3 mb-4 items-center">
-        <div className="search-container flex-1 min-w-[220px]">
+        <div className="search-container flex-1 min-w-[220px]" style={{display:'flex',flexDirection:'column'}}>
           <div className="search-icon">🔍</div>
           <input
             type="text"
@@ -197,6 +245,10 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
           />
+          <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:4}}>
+            <Badge label="Next" value={countdown || '--:--'} tooltip={`Scheduled refresh every ${REFRESH_INTERVAL_MS/60000} minutes`} kind="next" />
+            <Badge label="Age" value={age || '0:00'} tooltip="Time since last successful data fetch" kind="age" ageValue={age} />
+          </div>
         </div>
         {divineChaos && chaosIcon && divineIcon && (
           <div className="conversion-pill" title="Divine to Chaos ratio">
@@ -221,9 +273,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
         <button
           className="btn btn-sm"
           onClick={()=> {
-            // Force an immediate fresh pull bypassing initial loading spinner
             setLastUpdated(null)
-            // Use a temporary mode flip to trigger effect indirectly if desired; simplest is direct call path via helper
             ;(async()=>{
               try {
                 const data = await poeApi.getCurrencyData(selectedLeague, type, realm)
@@ -233,11 +283,13 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                 setChaosIcon(chaosEntry?.icon||null)
                 setDivineIcon(divineEntry?.icon||null)
                 if (divineEntry?.chaosEquivalent) setDivineChaos(divineEntry.chaosEquivalent)
-                setLastUpdated(Date.now())
+                const now = Date.now()
+                setLastUpdated(now)
+                setNextRefresh(now + REFRESH_INTERVAL_MS)
               } catch {/* ignore */}
             })()
           }}
-          title="Manual refresh (bypasses 60s interval)"
+          title="Manual refresh (bypasses schedule)"
           style={{background:'#222'}}
         >Refresh</button>
         {lastUpdated && (
@@ -259,7 +311,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
       {/* Currency Table */}
       <div className="card-header" style={{ borderBottom: "2px solid var(--poe-border)" }}>
         <h3 className="card-title">📈 {selectedLeague} Economy</h3>
-        <div className="status status-connected">{filteredData.length} items</div>
+  <div className="status status-connected">{filteredData.length} items</div>
       </div>
 
       <div className="table-container">
