@@ -54,7 +54,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
     return v < 0.1 ? v.toFixed(3) : v.toFixed(2)
   }
 
-  // Build PoE trade search query body for API POST (returns hash id for /trade/search/{league}/{id})
+  // Build PoE trade search query body (used by redirect URL builder)
   function buildItemTradeQuery(line: any): any | null {
     const nmLower = (line.name || line.currencyTypeName || '').toLowerCase()
     if (nmLower === 'chaos orb') return null // handled on currency tab
@@ -76,41 +76,14 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
     }
     return query
   }
-  // Cache of built search ids to avoid repeated network calls: key = league|type|name|base
-  const tradeIdCache = new Map<string,string>()
-  function cacheKey(line: any) {
-    return [league, line.name||'', line.baseType||'', line.currencyTypeName||''].join('|')
-  }
-  async function openTrade(line: any, btn: HTMLButtonElement) {
+  // Build redirect URL to internal route that performs the search server-side then 302 redirects
+  function buildTradeRedirect(line: any): string | null {
     const query = buildItemTradeQuery(line)
-    if (!query) return
-    const key = cacheKey(line)
-    const original = btn.textContent
-    // Pre-open window to avoid popup blocker
-    const preload = window.open('about:blank','_blank','noopener,noreferrer')
-    if (tradeIdCache.has(key)) {
-      const id = tradeIdCache.get(key)!
-      preload?.location.replace(`https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}/${id}`)
-      return
-    }
-    btn.textContent = '…'; btn.disabled = true
-    try {
-      const res = await fetch(`/api/trade/search`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ league, query }) })
-      if (!res.ok) throw new Error('search_failed')
-      const json = await res.json()
-      if (json?.id) {
-        tradeIdCache.set(key, json.id)
-        preload?.location.replace(`https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}/${json.id}`)
-      } else throw new Error('no_id')
-    } catch (e) {
-      console.warn('Trade search failed', e)
-      preload?.close()
-      btn.textContent = 'x'
-      setTimeout(()=>{ btn.textContent = original || '↗'; btn.disabled = false }, 1200)
-      return
-    }
-    btn.textContent = original || '↗'
-    btn.disabled = false
+    if (!query) return null
+    const name = encodeURIComponent(line.name || '')
+    const base = encodeURIComponent(line.baseType || '')
+    const ctn = encodeURIComponent(line.currencyTypeName || '')
+    return `/api/trade/open?league=${encodeURIComponent(league)}&name=${name}&base=${base}&ctn=${ctn}`
   }
 
   if (loading) return <div className="loading"><div className="spinner"/>Loading {title}...</div>
@@ -210,7 +183,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
                   <td><Sparkline data={spark.slice(-24)} changeHint={change} /></td>
                   <td className={getTrendColor(change)} title={change !== undefined ? `${change.toFixed(2)}%` : '0%'}>{formatChange(change)}</td>
                   <td title={`Approximate listings: ${listed}`}>~{listed >=1000? `${Math.round(listed/100)/10}k`: listed}</td>
-                  <td>{(() => { const q = buildItemTradeQuery(l); return q ? <button className="trade-icon-btn" title="Open trade search" onClick={(e)=>openTrade(l, e.currentTarget)}>↗</button> : null })()}</td>
+                  <td>{(() => { const url = buildTradeRedirect(l); return url ? <a className="trade-icon-btn" href={url} target="_blank" rel="noopener noreferrer" title="Open trade search">↗</a> : null })()}</td>
                 </tr>
               )
             })}
