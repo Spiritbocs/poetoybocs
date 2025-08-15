@@ -4,6 +4,16 @@ export async function POST(request: Request) {
     const { code, state, codeVerifier } = body
 
     const envRedirect = process.env.NEXT_PUBLIC_POE_REDIRECT_URI || ""
+    const envClientId = process.env.NEXT_PUBLIC_POE_CLIENT_ID || ""
+    const hasSecret = !!process.env.POE_CLIENT_SECRET
+
+    if (!envClientId || !hasSecret || !envRedirect) {
+      console.error("OAuth env missing", { envClientIdSet: !!envClientId, hasSecret, envRedirectSet: !!envRedirect })
+      return Response.json(
+        { error: "server_misconfig", error_description: "OAuth environment variables not set server-side" },
+        { status: 500 },
+      )
+    }
     console.log("Token exchange request:", {
       code: code?.substring(0, 10) + "...",
       state,
@@ -19,7 +29,7 @@ export async function POST(request: Request) {
       },
       body: new URLSearchParams({
         grant_type: "authorization_code",
-        client_id: process.env.NEXT_PUBLIC_POE_CLIENT_ID || "",
+        client_id: envClientId,
         client_secret: process.env.POE_CLIENT_SECRET || "",
         code: code,
   redirect_uri: envRedirect,
@@ -29,18 +39,22 @@ export async function POST(request: Request) {
     })
 
     if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text()
-      console.error("Token exchange failed:", {
+      let providerError: any = null
+      try {
+        providerError = await tokenResponse.json()
+      } catch {
+        const fallback = await tokenResponse.text()
+        providerError = { raw: fallback }
+      }
+      console.error("Token exchange failed", {
         status: tokenResponse.status,
-        statusText: tokenResponse.statusText,
-        headers: Object.fromEntries(tokenResponse.headers.entries()),
-        body: errorText,
+        providerError,
       })
       return Response.json(
         {
-          error: "Token exchange failed",
+          error: providerError?.error || "token_exchange_failed",
+          error_description: providerError?.error_description || providerError?.raw || "Unknown error",
           status: tokenResponse.status,
-          details: errorText,
         },
         { status: tokenResponse.status },
       )
