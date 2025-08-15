@@ -166,6 +166,17 @@ interface AccountProfile {
   // Other fields from PoE profile can be added as needed
 }
 
+// Character data structure (subset of PoE API response fields)
+interface CharacterSummary {
+  name: string
+  level: number
+  class: string
+  classId?: number
+  league?: string
+  ascendancyClass?: number
+  lastActive?: string
+}
+
 class PoEAPI {
   private baseUrl = "https://api.pathofexile.com"
   private tradeUrl = "https://www.pathofexile.com/api/trade"
@@ -176,7 +187,7 @@ private oauthConfig: OAuthConfig = {
   clientId: process.env.NEXT_PUBLIC_POE_CLIENT_ID || "",
   clientSecret: process.env.POE_CLIENT_SECRET || "",
   redirectUri: process.env.NEXT_PUBLIC_POE_REDIRECT_URI || "",
-  scopes: ["account:profile"],
+  scopes: ["account:profile", "account:characters"],
 }
 
   // Cache for API responses
@@ -185,6 +196,34 @@ private oauthConfig: OAuthConfig = {
 
   private authToken: AuthToken | null = null
   private profile: AccountProfile | null = null
+  private characters: CharacterSummary[] | null = null
+  private selectedCharacter: CharacterSummary | null = null
+
+  private ascendancyIconMap: Record<string, string> = {
+    // Mapping of ascendancy names to PoE Wiki avatar images
+    // (These are stable file names; adjust if any 404.)
+    Ascendant: "https://www.poewiki.net/images/5/59/Ascendant_avatar.png",
+    Slayer: "https://www.poewiki.net/images/4/4a/Slayer_avatar.png",
+    Gladiator: "https://www.poewiki.net/images/8/8b/Gladiator_avatar.png",
+    Champion: "https://www.poewiki.net/images/2/27/Champion_avatar.png",
+    Assassin: "https://www.poewiki.net/images/2/26/Assassin_avatar.png",
+    Saboteur: "https://www.poewiki.net/images/9/93/Saboteur_avatar.png",
+    Trickster: "https://www.poewiki.net/images/2/23/Trickster_avatar.png",
+    Juggernaut: "https://www.poewiki.net/images/f/fd/Juggernaut_avatar.png",
+    Berserker: "https://www.poewiki.net/images/a/a7/Berserker_avatar.png",
+    Chieftain: "https://www.poewiki.net/images/6/62/Chieftain_avatar.png",
+    Necromancer: "https://www.poewiki.net/images/7/7f/Necromancer_avatar.png",
+    Occultist: "https://www.poewiki.net/images/a/ab/Occultist_avatar.png",
+    Elementalist: "https://www.poewiki.net/images/7/7e/Elementalist_avatar.png",
+    Deadeye: "https://www.poewiki.net/images/3/38/Deadeye_avatar.png",
+    Raider: "https://www.poewiki.net/images/f/f1/Raider_avatar.png",
+    Pathfinder: "https://www.poewiki.net/images/1/1c/Pathfinder_avatar.png",
+    Inquisitor: "https://www.poewiki.net/images/1/17/Inquisitor_avatar.png",
+    Hierophant: "https://www.poewiki.net/images/7/7d/Hierophant_avatar.png",
+    Guardian: "https://www.poewiki.net/images/6/6f/Guardian_avatar.png",
+    RaiderPlaceholder: "https://www.poewiki.net/images/3/38/Deadeye_avatar.png", // example fallback
+    TricksterPlaceholder: "https://www.poewiki.net/images/2/23/Trickster_avatar.png",
+  }
 
   private generateCodeVerifier(): string {
     const array = new Uint8Array(32)
@@ -317,9 +356,13 @@ private oauthConfig: OAuthConfig = {
   logout(): void {
     this.authToken = null
     this.profile = null
+    this.characters = null
+    this.selectedCharacter = null
     if (typeof window !== "undefined") {
       localStorage.removeItem("poe_auth_token")
       localStorage.removeItem("poe_profile")
+      localStorage.removeItem("poe_characters")
+      localStorage.removeItem("poe_selected_character")
     }
   }
 
@@ -350,6 +393,87 @@ private oauthConfig: OAuthConfig = {
       console.error("Error fetching profile", e)
       return null
     }
+  }
+
+  async getCharacters(force = false): Promise<CharacterSummary[] | null> {
+    if (!this.authToken) return null
+    if (this.characters && !force) return this.characters
+    try {
+      // Need profile name for accountName param if endpoint requires it
+      const profile = await this.getProfile(false)
+      const accountName = profile?.name
+      // PoE character endpoint (OAuth). If CORS issues arise, we'll proxy later.
+      // Using character-window legacy endpoint since it includes level/league.
+      const qs = accountName ? `?accountName=${encodeURIComponent(accountName)}` : ""
+      const res = await this.makeAuthenticatedRequest(`/character-window/get-characters${qs}`)
+      if (!res.ok) {
+        console.warn("Characters fetch failed", res.status, res.statusText)
+        return null
+      }
+      const data = await res.json()
+      if (!Array.isArray(data)) {
+        console.warn("Unexpected characters payload", data)
+        return null
+      }
+      // Normalize
+      this.characters = data.map((c: any): CharacterSummary => ({
+        name: c.name,
+        level: c.level,
+        class: c.class || c.baseClass || "Unknown",
+        classId: c.classId,
+        league: c.league,
+        ascendancyClass: c.ascendancyClass,
+        lastActive: c.lastActive,
+      }))
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem('poe_characters', JSON.stringify(this.characters)) } catch {}
+      }
+      // Auto-select previous or first
+      if (!this.selectedCharacter && this.characters.length) {
+        const persisted = typeof window !== 'undefined' ? localStorage.getItem('poe_selected_character') : null
+        if (persisted) {
+          const found = this.characters.find(c=>c.name===persisted)
+          this.selectedCharacter = found || this.characters[0]
+        } else {
+          this.selectedCharacter = this.characters[0]
+        }
+      }
+      return this.characters
+    } catch (e) {
+      console.error("Error fetching characters", e)
+      return null
+    }
+  }
+
+  getCachedCharacters(): CharacterSummary[] | null {
+    if (this.characters) return this.characters
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('poe_characters')
+      if (stored) {
+        try { this.characters = JSON.parse(stored) } catch { localStorage.removeItem('poe_characters') }
+      }
+    }
+    return this.characters
+  }
+
+  getSelectedCharacter(): CharacterSummary | null {
+    return this.selectedCharacter
+  }
+
+  setSelectedCharacter(name: string) {
+    if (!this.characters) return
+    const found = this.characters.find(c=>c.name===name)
+    if (found) {
+      this.selectedCharacter = found
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem('poe_selected_character', found.name) } catch {}
+      }
+    }
+  }
+
+  getAscendancyIcon(ascName: string | undefined): string | null {
+    if (!ascName) return null
+    return this.ascendancyIconMap[ascName] || null
   }
 
   private async makeAuthenticatedRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
