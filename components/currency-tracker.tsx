@@ -218,22 +218,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
     return 'chaos'
   }
 
-  // Small badge component for countdown & age
-  const Badge: React.FC<{ label: string; value: string; tooltip?: string; kind: 'next'|'age'; ageValue?: string | null }> = ({ label, value, tooltip, kind, ageValue }) => {
-    let color = '#b30000'
-    if (kind === 'age' && ageValue) {
-      const [mStr] = ageValue.split(':')
-      const m = parseInt(mStr,10)||0
-      if (m < 3) { color = '#4caf50' }
-      else if (m < 6) { color = '#ff9800' }
-      else { color = '#f44336' }
-    }
-    return (
-      <div title={tooltip} style={{ fontSize:11,fontWeight:600,letterSpacing:'.5px',display:'flex',alignItems:'center',gap:2, color }}>
-        <span style={{opacity:.55}}>{label}:</span><span>{value}</span>
-      </div>
-    )
-  }
+  // (Badge component removed; timers now only in top navigation)
 
   const TradeMenu: React.FC<{ currency: CurrencyData }> = ({ currency }) => {
     const [open, setOpen] = useState(false)
@@ -356,11 +341,6 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
           <span style={{fontSize:12,opacity:.5}}>({selectedLeague} Economy)</span>
         </h3>
         <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:12}}>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <Badge label="Next" value={countdown || '--:--'} tooltip={`Next scheduled refresh (every ${REFRESH_INTERVAL_MS/60000}m)`} kind="next" />
-            <Badge label="Age" value={age || '0:00'} tooltip="Data age" kind="age" ageValue={age} />
-            <span style={{cursor:'help',fontSize:14}} title={`Next = time until auto refresh. Age = time since last fetch. Interval ${REFRESH_INTERVAL_MS/60000} minutes.`}>ℹ️</span>
-          </div>
           <div className="status status-connected">{filteredData.length} items</div>
         </div>
       </div>
