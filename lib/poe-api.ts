@@ -155,6 +155,17 @@ interface PKCEData {
   state: string
 }
 
+interface AccountProfile {
+  name?: string
+  uuid?: string
+  realm?: string
+  guild?: {
+    name?: string
+    tag?: string
+  }
+  // Other fields from PoE profile can be added as needed
+}
+
 class PoEAPI {
   private baseUrl = "https://api.pathofexile.com"
   private tradeUrl = "https://www.pathofexile.com/api/trade"
@@ -163,9 +174,9 @@ class PoEAPI {
 
 private oauthConfig: OAuthConfig = {
   clientId: "poetoybocs",
-  clientSecret: "0qOAktMWmksl", // <-- UPDATED SECRET
-  redirectUri: "https://poetoybocs.vercel.app/oauth/callback", // <-- YOUR URI
-  scopes: ["account:profile"], // <-- ONLY PROFILE
+  clientSecret: "0qOAktMWmksl", // TODO: move to server env
+  redirectUri: "https://poetoybocs.vercel.app/oauth/callback",
+  scopes: ["account:profile"], // minimal scope for username display
 }
 
   // Cache for API responses
@@ -173,6 +184,7 @@ private oauthConfig: OAuthConfig = {
   private cacheTimeout = 10 * 60 * 1000 // 10 minutes (align with desired currency refresh cadence)
 
   private authToken: AuthToken | null = null
+  private profile: AccountProfile | null = null
 
   private generateCodeVerifier(): string {
     const array = new Uint8Array(32)
@@ -279,6 +291,11 @@ private oauthConfig: OAuthConfig = {
       if (stored) {
         try {
           this.authToken = JSON.parse(stored)
+          // Attempt to load cached profile too
+          const prof = localStorage.getItem("poe_profile")
+          if (prof) {
+            try { this.profile = JSON.parse(prof) } catch { localStorage.removeItem("poe_profile") }
+          }
           return true
         } catch (error) {
           console.error("Error loading stored token:", error)
@@ -295,8 +312,39 @@ private oauthConfig: OAuthConfig = {
 
   logout(): void {
     this.authToken = null
+    this.profile = null
     if (typeof window !== "undefined") {
       localStorage.removeItem("poe_auth_token")
+      localStorage.removeItem("poe_profile")
+    }
+  }
+
+  getCachedProfile(): AccountProfile | null {
+    return this.profile
+  }
+
+  async getProfile(force = false): Promise<AccountProfile | null> {
+    if (!this.authToken) return null
+    if (this.profile && !force) return this.profile
+    try {
+      const res = await this.makeAuthenticatedRequest("/profile")
+      if (!res.ok) {
+        if (res.status === 401) {
+          console.warn("Unauthorized fetching profile – token may be invalid/expired")
+        } else {
+          console.warn("Profile fetch failed", res.status, res.statusText)
+        }
+        return null
+      }
+      const data: AccountProfile = await res.json()
+      this.profile = data
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("poe_profile", JSON.stringify(data)) } catch {}
+      }
+      return data
+    } catch (e) {
+      console.error("Error fetching profile", e)
+      return null
     }
   }
 

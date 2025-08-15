@@ -6,12 +6,22 @@ import { poeApi } from "@/lib/poe-api"
 export function AuthStatus() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [accountName, setAccountName] = useState<string | null>(null)
 
   useEffect(() => {
     // Check for stored token on component mount
     const hasToken = poeApi.loadStoredToken()
     setIsAuthenticated(hasToken)
-    setIsLoading(false)
+    const loadProfile = async () => {
+      if (hasToken) {
+        const cached = poeApi.getCachedProfile()
+        if (cached?.name) setAccountName(cached.name)
+        const profile = await poeApi.getProfile(false)
+        if (profile?.name) setAccountName(profile.name)
+      }
+      setIsLoading(false)
+    }
+    loadProfile()
   }, [])
 
   const handleLogin = async () => {
@@ -24,8 +34,9 @@ export function AuthStatus() {
   }
 
   const handleLogout = () => {
-    poeApi.logout()
-    setIsAuthenticated(false)
+  poeApi.logout()
+  setIsAuthenticated(false)
+  setAccountName(null)
   }
 
   if (isLoading) {
@@ -44,7 +55,7 @@ export function AuthStatus() {
       <div className="card-header">
         <h3 className="card-title">🔐 Authentication</h3>
         <div className={`status ${isAuthenticated ? "status-connected" : "status-disconnected"}`}>
-          {isAuthenticated ? "Connected" : "Not Connected"}
+          {isAuthenticated ? (accountName ? accountName : "Connected") : "Not Connected"}
         </div>
       </div>
 
