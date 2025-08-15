@@ -157,6 +157,12 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
     const query = { exchange: { status: { option: 'online' }, have: [have], want: [want] } }
     return `https://www.pathofexile.com/trade/exchange/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(query))}`
   }
+  const decideBaseCurrency = (c: CurrencyData): 'chaos' | 'divine' => {
+    if (!divineChaos || !c.chaosEquivalent) return 'chaos'
+    // If item worth more than 5 Divine (adjustable), switch to Divine base to match market reality
+    if (c.chaosEquivalent > divineChaos * 5) return 'divine'
+    return 'chaos'
+  }
 
   // Small badge component for countdown & age
   const Badge: React.FC<{ label: string; value: string; tooltip?: string; kind: 'next'|'age'; ageValue?: string | null }> = ({ label, value, tooltip, kind, ageValue }) => {
@@ -471,8 +477,9 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                         const slug = getTradeSlug(currency)
                         // Skip if slug is chaos (trading chaos for chaos pointless)
                         if (slug === 'chaos') return null
-                        const have = mode === 'buy' ? 'chaos' : slug
-                        const want = mode === 'buy' ? slug : 'chaos'
+                        const base = decideBaseCurrency(currency)
+                        const have = mode === 'buy' ? base : slug
+                        const want = mode === 'buy' ? slug : base
                         const url = buildExchangeUrl(selectedLeague, have, want)
                         const tooltip = `${mode === 'buy' ? 'Buy' : 'Sell'} via pathofexile.com (${have} -> ${want})`
                         return <a href={url} target="_blank" rel="noopener noreferrer" className="trade-btn" title={tooltip}>Trade ↗</a>
