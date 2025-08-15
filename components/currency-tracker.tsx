@@ -36,10 +36,13 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
         const data = await poeApi.getCurrencyData(selectedLeague, type, realm)
         if (abort) return
         setCurrencyData(data); setFilteredData(data)
-        const chaosEntry = data.find(d=>d.detailsId==='chaos-orb')
-        const divineEntry = data.find(d=>d.detailsId==='divine-orb')
-        setChaosIcon(chaosEntry?.icon||null)
-        setDivineIcon(divineEntry?.icon||null)
+  const chaosEntry = data.find(d=>d.detailsId==='chaos-orb')
+  const divineEntry = data.find(d=>d.detailsId==='divine-orb')
+  // Always keep or set a chaos icon so chain never appears without it
+  const fallbackChaos = 'https://www.poewiki.net/images/5/5a/Chaos_Orb_inventory_icon.png'
+  setChaosIcon(prev => chaosEntry?.icon || prev || fallbackChaos)
+  // Only update divine icon if present to avoid clearing between tab switches
+  if (divineEntry?.icon) setDivineIcon(divineEntry.icon)
         if (divineEntry?.chaosEquivalent) setDivineChaos(divineEntry.chaosEquivalent)
         const now = Date.now()
         setLastUpdated(now)

@@ -2,15 +2,21 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'vsCode',
-  description: 'Created with vsCode',
-  generator: 'vsCode.app',
+  title: 'Spiritbocs Tracker',
+  description: 'Spiritbocs Tracker — Path of Exile economy & currency monitor',
+  generator: 'Spiritbocs',
+  icons: {
+    icon: 'https://i.imgur.com/lo3oTYL.png',
+    shortcut: 'https://i.imgur.com/lo3oTYL.png',
+    apple: 'https://i.imgur.com/lo3oTYL.png'
+  }
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
+        <link rel="icon" href="https://i.imgur.com/lo3oTYL.png" />
   <style>{`
 html {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
