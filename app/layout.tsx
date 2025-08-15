@@ -1,6 +1,4 @@
 import type { Metadata } from 'next'
-import { GeistSans } from 'geist/font/sans'
-import { GeistMono } from 'geist/font/mono'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -17,13 +15,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <style>{`
+  <style>{`
 html {
-  font-family: ${GeistSans.style.fontFamily};
-  --font-sans: ${GeistSans.variable};
-  --font-mono: ${GeistMono.variable};
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --font-sans: system-ui;
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
 }
-        `}</style>
+  `}</style>
       </head>
       <body>{children}</body>
     </html>
