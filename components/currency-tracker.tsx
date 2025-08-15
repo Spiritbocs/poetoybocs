@@ -428,8 +428,15 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                         fontWeight:600
                       }}>{formatChange(change)}</span>
                     </td>
-                    <td title="Approximate listing sample count (pay + receive)">~{(() => {
-                      const listedRaw = (currency.pay?.data_point_count||0) + (currency.receive?.data_point_count||0)
+                    <td title="Approximate # of listings (side-specific count, poe.ninja style)">~{(() => {
+                      // poe.ninja appears to show primary side 'count' (not data_point_count). Use side tied to displayed price.
+                      const primarySide = mode === 'buy' ? currency.receive : currency.pay
+                      const secondarySide = mode === 'buy' ? currency.pay : currency.receive
+                      let listedRaw = primarySide?.count || primarySide?.data_point_count || 0
+                      // Fallback: if zero but other side has data, use the other side's count
+                      if (!listedRaw && (secondarySide?.count || secondarySide?.data_point_count)) {
+                        listedRaw = secondarySide?.count || secondarySide?.data_point_count || 0
+                      }
                       return listedRaw >= 1000 ? `${Math.round(listedRaw/100)/10}k` : `${listedRaw}`
                     })()}</td>
                     <td>
