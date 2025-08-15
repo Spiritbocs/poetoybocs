@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+// Detail page navigation removed – keeping table inline only.
 import { poeApi } from '@/lib/poe-api'
 import { Sparkline } from './sparkline'
 
@@ -14,7 +14,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(()=> (typeof window!=='undefined' ? (localStorage.getItem(`global_search_${type}`) || '') : ''))
   const [mode, setMode] = useState<'buy'|'sell'>(()=> (typeof window!=='undefined' && (localStorage.getItem('global_trade_mode') as any)) || 'buy')
-  const router = useRouter()
+  // Removed router usage since detail pages deleted.
   const [tooltip, setTooltip] = useState<{ x:number; y:number; row:any; spark:number[]; change7d:number; change24h:number } | null>(null)
 
   useEffect(() => {
@@ -145,12 +145,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
               const divineEq = divineChaos && chaosEq ? chaosEq / divineChaos : undefined
               return (
                 <tr key={i}
-                  style={{cursor:'pointer'}}
                   onMouseLeave={()=> setTooltip(null)}
-                  onClick={()=>{
-                    const slug = (l.detailsId || name).toLowerCase().replace(/[^a-z0-9]+/g,'-')
-                    router.push(`/detail/item/${slug}?league=${encodeURIComponent(league)}&type=${encodeURIComponent(type)}&realm=${encodeURIComponent(realm)}`)
-                  }}
                 >
                   <td className="sticky-col">
                     <div className="flex items-center gap-2 justify-between" style={{width:'100%', position:'relative'}}
@@ -220,7 +215,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
             <div className="tt-line" style={{color: tooltip.change24h>0? '#57d977': tooltip.change24h<0? '#ff6a6a':'#d5c186'}}>~24h: {tooltip.change24h>0?'+':''}{Math.round(tooltip.change24h)}%</div>
             {(() => { const ce = tooltip.row.chaosValue || tooltip.row.chaosEquivalent; if (!ce) return null; return <div className="tt-line">Chaos: <strong>{ce.toFixed(2)}</strong></div> })()}
             {(() => { if (!divineChaos) return null; const ce = tooltip.row.chaosValue || tooltip.row.chaosEquivalent; if (!ce) return null; const de = ce / divineChaos; return <div className="tt-line">Divine: <strong>{de.toFixed(4)}</strong></div> })()}
-            <div className="tt-line" style={{opacity:.55, marginTop:4}}>Click row for details</div>
+            <div className="tt-line" style={{opacity:.45, marginTop:4}}>Detail pages disabled</div>
           </div>
         )}
       </div>
