@@ -1,6 +1,7 @@
 "use client"
 import { Sparkline } from '@/components/sparkline'
 import { poeApi } from '@/lib/poe-api'
+import { WikiContent } from '@/components/wiki-content'
 import { useEffect, useState } from 'react'
 import { useSearchParams, useParams, useRouter } from 'next/navigation'
 
@@ -81,6 +82,7 @@ export default function CurrencyDetailPage() {
         </div>
         <div style={{marginTop:20,fontSize:11,opacity:.45}}>Longer timeframes coming soon (needs history endpoint).</div>
       </div>
+      <WikiContent title={line.currencyTypeName || ''} />
     </div>
   )
 }
