@@ -1,0 +1,599 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Path of Exile Theme - Dark and Game-Inspired */
+:root {
+  --poe-bg-primary: #0a0a0a;
+  --poe-bg-secondary: #1a1a1a;
+  --poe-bg-card: #2a2a2a;
+  --poe-border: #3a3a3a;
+  --poe-text-primary: #f0f0f0;
+  --poe-text-secondary: #c0c0c0;
+  --poe-text-muted: #888888;
+  --poe-accent: #d4af37;
+  --poe-accent-hover: #e6c547;
+  --poe-blue: #4a9eff;
+  --poe-green: #4ade80;
+  --poe-red: #ef4444;
+  --poe-orange: #f97316;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@theme inline {
+  /* optional: --font-sans, --font-serif, --font-mono if they are applied in the layout.tsx */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", sans-serif;
+  background: linear-gradient(135deg, var(--poe-bg-primary) 0%, var(--poe-bg-secondary) 100%);
+  color: var(--poe-text-primary);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Header */
+.header {
+  text-align: center;
+  margin-bottom: 40px;
+  padding: 40px 0;
+}
+
+.header h1 {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--poe-accent);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  margin-bottom: 12px;
+}
+
+.header p {
+  font-size: 1.2rem;
+  color: var(--poe-text-secondary);
+}
+
+/* Cards */
+.card {
+  background: var(--poe-bg-card);
+  border: 1px solid var(--poe-border);
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--poe-border);
+}
+
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--poe-text-primary);
+}
+
+/* Grid Layout */
+.grid {
+  display: grid;
+  gap: 24px;
+}
+
+.grid-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 768px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn-sm {
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 5px;
+}
+
+.btn-primary {
+  background: var(--poe-blue);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #3b82f6;
+  transform: translateY(-1px);
+}
+
+.btn-accent {
+  background: var(--poe-accent);
+  color: var(--poe-bg-primary);
+}
+
+.btn-accent:hover {
+  background: var(--poe-accent-hover);
+}
+
+/* Tabs */
+.tabs {
+  border-bottom: 1px solid var(--poe-border);
+  margin-bottom: 24px;
+}
+
+.tab-list {
+  display: flex;
+  gap: 0;
+}
+
+.tab-button {
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  color: var(--poe-text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.tab-button.active {
+  color: var(--poe-accent);
+  border-bottom-color: var(--poe-accent);
+}
+
+.tab-button:hover {
+  color: var(--poe-text-primary);
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: var(--poe-text-primary);
+}
+
+.form-input,
+.form-select {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--poe-bg-secondary);
+  border: 1px solid var(--poe-border);
+  border-radius: 6px;
+  color: var(--poe-text-primary);
+  font-size: 14px;
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--poe-accent);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+}
+
+/* Tables */
+.table-container {
+  overflow-x: auto;
+  border-radius: 6px;
+  border: 1px solid var(--poe-border);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--poe-bg-secondary);
+}
+
+.table th,
+.table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--poe-border);
+}
+
+.table td.price-cell span { font-weight:500; }
+.table tbody tr { font-size:13px; }
+.table tbody tr img { image-rendering: -webkit-optimize-contrast; }
+
+/* Price grid alignment */
+.price-grid { display:grid; align-items:center; justify-content:start; gap:6px; grid-auto-flow:column; }
+.price-grid.has-divine { grid-template-columns: auto auto auto 14px auto; }
+.price-grid.no-divine { grid-template-columns: auto auto 14px auto; }
+.price-grid .grp { display:inline-flex; align-items:center; gap:4px; }
+.price-grid img { width:24px; height:24px; }
+.price-grid .arrow { opacity:.5; text-align:center; }
+.price-grid .wiki-badge { margin-right:4px; }
+.price-grid .num { font-variant-numeric: tabular-nums; }
+
+/* Conversion pill */
+.conversion-pill { display:flex; align-items:center; gap:6px; background:var(--poe-bg-secondary); border:1px solid var(--poe-border); padding:4px 10px; border-radius:20px; font-size:12px; }
+.conversion-pill img { width:16px; height:16px; }
+.conversion-pill .num { font-weight:600; font-variant-numeric: tabular-nums; }
+
+/* Toggle switch */
+.toggle-wrapper { display:flex; align-items:center; gap:8px; font-size:12px; }
+.toggle { position:relative; width:40px; height:20px; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle-track { position:absolute; inset:0; background:var(--poe-bg-secondary); border:1px solid var(--poe-border); border-radius:999px; transition:background .25s, border-color .25s; }
+.toggle-thumb { position:absolute; top:2px; left:2px; width:16px; height:16px; background:var(--poe-text-primary); border-radius:50%; transition:transform .25s; }
+.toggle input:checked + .toggle-track { background:var(--poe-accent,#18d1b6); border-color:var(--poe-accent,#18d1b6); }
+.toggle input:checked + .toggle-track .toggle-thumb { transform:translateX(20px); background:#fff; }
+.toggle-label { user-select:none; cursor:pointer; display:flex; align-items:center; gap:4px; }
+
+/* Sidebar navigation */
+.layout-split { display:flex; gap:24px; }
+.sidebar-nav { width:220px; flex-shrink:0; padding:8px 0; }
+.sidebar-nav { background: linear-gradient(180deg, rgba(32,32,32,0.95) 0%, rgba(20,20,20,0.95) 100%); border:1px solid var(--poe-border); border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.4); position:sticky; top:20px; max-height:calc(100vh - 60px); overflow:auto; }
+/* Themed scrollbar for sidebar */
+.sidebar-nav::-webkit-scrollbar { width:10px; }
+.sidebar-nav::-webkit-scrollbar-track { background:rgba(10,10,10,0.4); border-left:1px solid #111; }
+.sidebar-nav::-webkit-scrollbar-thumb { background:linear-gradient(#3a3a3a,#232323); border:1px solid #555; border-radius:8px; box-shadow:inset 0 0 4px rgba(0,0,0,.6); }
+.sidebar-nav::-webkit-scrollbar-thumb:hover { background:linear-gradient(#4a4a4a,#2d2d2d); }
+.sidebar-nav { scrollbar-width:thin; scrollbar-color:#444 rgba(10,10,10,0.4); }
+.nav-group { margin-bottom:20px; }
+.nav-heading { font-size:11px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:var(--poe-text-muted); padding:4px 12px; }
+.nav-items { list-style:none; margin:4px 0 0; padding:0; }
+.nav-link { width:100%; text-align:left; background:transparent; border:0; color:var(--poe-text-primary); padding:6px 12px; font-size:13px; border-radius:4px; cursor:pointer; }
+.nav-link:hover { background:var(--poe-bg-secondary); }
+.nav-link.active { background:var(--poe-accent-faint,#123); color:var(--poe-accent,#18d1b6); font-weight:600; }
+/* Low confidence warning */
+.low-conf-warning { font-size:11px; background:#5c1f1f; color:#fbd5d5; padding:4px 8px; border:1px solid #7a2a2a; border-radius:6px; max-width:240px; line-height:1.2; }
+
+/* Tooltip for low confidence info */
+.low-conf-toggle { position:relative; }
+.low-conf-toggle .label-text { position:relative; display:inline-flex; align-items:center; gap:4px; }
+.info-icon { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; font-size:10px; background:#2f3a44; border:1px solid var(--poe-border); border-radius:50%; cursor:help; color:var(--poe-text-secondary); }
+.label-text:hover .info-icon { background:#3a464f; }
+.tooltip { position:absolute; left:0; top:110%; z-index:30; background:#1f2529; color:var(--poe-text-secondary); padding:8px 10px; width:260px; font-size:11px; line-height:1.3; border:1px solid var(--poe-border); border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,.5); opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; transform:translateY(-4px); }
+.label-text:focus .tooltip, .label-text:hover .tooltip { opacity:1; pointer-events:auto; transform:translateY(0); }
+
+/* Sidebar icon fallback */
+.icon-fallback { display:inline-block; width:18px; height:18px; margin-right:8px; background:linear-gradient(135deg,#333,#111); border:1px solid #444; border-radius:3px; box-shadow:inset 0 0 3px rgba(0,0,0,.6); }
+
+/* Sticky first column */
+.table th.sticky-col, .table td.sticky-col { position:sticky; left:0; background:var(--poe-bg-secondary); box-shadow:2px 0 0 0 var(--poe-border); z-index:5; }
+.table thead th.sticky-col { z-index:6; }
+
+@media (max-width: 900px) {
+  .layout-split { flex-direction:column; }
+  .sidebar-nav { width:100%; display:flex; overflow-x:auto; }
+  .nav-group { margin-right:24px; }
+  .nav-heading { display:none; }
+  .nav-link { white-space:nowrap; }
+}
+
+.table th {
+  background: var(--poe-bg-card);
+  font-weight: 600;
+  color: var(--poe-text-primary);
+}
+
+.table td {
+  color: var(--poe-text-secondary);
+}
+
+.table tbody tr:hover {
+  background: rgba(212, 175, 55, 0.1);
+}
+
+/* Active column highlight */
+.table th.active-col {
+  position: relative;
+}
+.table th.active-col::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--poe-blue);
+}
+
+/* Segmented controls */
+.segmented {
+  display: inline-flex;
+  background: #272b30;
+  border: 1px solid var(--poe-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.segmented button {
+  background: none;
+  border: none;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--poe-text-muted);
+  transition: background .15s, color .15s;
+}
+.segmented button:hover { color: var(--poe-text-primary); }
+.segmented button.active {
+  background: #32383d;
+  color: #fff;
+  box-shadow: inset 0 -2px 0 var(--poe-blue);
+}
+
+/* Tiny badge */
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  background: #2a2f33;
+  border: 1px solid var(--poe-border);
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--poe-text-secondary);
+  line-height: 1;
+}
+.badge:hover { background: #33393e; color: var(--poe-text-primary); }
+
+/* Compact trade menu */
+.trade-menu-item:hover { background: #343b40; }
+
+/* Utility shrink */
+.text-xs { font-size: 12px; }
+
+/* Status indicators */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-connected {
+  background: rgba(74, 222, 128, 0.2);
+  color: var(--poe-green);
+}
+
+.status-disconnected {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--poe-red);
+}
+
+/* Loading states */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--poe-text-muted);
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--poe-border);
+  border-top: 2px solid var(--poe-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Search */
+.search-container {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 12px 10px 40px;
+  background: var(--poe-bg-secondary);
+  border: 1px solid var(--poe-border);
+  border-radius: 6px;
+  color: var(--poe-text-primary);
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--poe-text-muted);
+}
+
+/* Utility classes */
+.text-center {
+  text-align: center;
+}
+.text-right {
+  text-align: right;
+}
+.text-success {
+  color: var(--poe-green);
+}
+.text-danger {
+  color: var(--poe-red);
+}
+.text-warning {
+  color: var(--poe-orange);
+}
+.text-muted {
+  color: var(--poe-text-muted);
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}
+.mb-6 {
+  margin-bottom: 24px;
+}
+.mt-4 {
+  margin-top: 16px;
+}
+
+.flex {
+  display: flex;
+}
+.items-center {
+  align-items: center;
+}
+.justify-between {
+  justify-content: space-between;
+}
+.gap-2 {
+  gap: 8px;
+}
+.gap-4 {
+  gap: 16px;
+}
