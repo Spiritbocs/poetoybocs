@@ -14,21 +14,23 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
   const [currencyData, setCurrencyData] = useState<CurrencyData[]>([])
   const [filteredData, setFilteredData] = useState<CurrencyData[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
+  const [searchTerm, setSearchTerm] = useState(()=> (typeof window!== 'undefined' ? (localStorage.getItem('global_search_currency') || '') : ''))
   const [selectedLeague, setSelectedLeague] = useState(league)
   const [type, setType] = useState<"Currency" | "Fragment">(()=> (initialType || (typeof window!=='undefined' && (localStorage.getItem('global_currency_type') as any)) || 'Currency'))
   const [mode, setMode] = useState<"buy" | "sell">(()=> (typeof window!=='undefined' && (localStorage.getItem('global_trade_mode') as any)) || 'buy')
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
   // Real-time (10 min) refresh handling
-  const REFRESH_INTERVAL_MS = 3 * 60 * 1000 // 3-minute client refresh cadence
+  const REFRESH_INTERVAL_MS = 3 * 60 * 1000 // 3-minute client refresh cadence (immutable schedule)
   const [nextRefresh, setNextRefresh] = useState<number | null>(null)
   const [countdown, setCountdown] = useState<string>("")
   const [age, setAge] = useState<string>("")
-  const [showLowConfidence, setShowLowConfidence] = useState(false)
+  const [showLowConfidence, setShowLowConfidence] = useState(()=> (typeof window!=='undefined' ? localStorage.getItem('global_show_low_confidence') === '1' : false))
   const router = useRouter()
   const [tooltip, setTooltip] = useState<{ x:number; y:number; currency:CurrencyData | null; spark:number[]; change7d:number; change24h:number } | null>(null)
   // respond to initialType changes (sidebar navigation)
   useEffect(() => { if (initialType && initialType !== type) { setType(initialType); localStorage.setItem('global_currency_type', initialType) } }, [initialType])
+  useEffect(()=>{ try { localStorage.setItem('global_search_currency', searchTerm) } catch {} }, [searchTerm])
+  useEffect(()=>{ try { if (showLowConfidence) localStorage.setItem('global_show_low_confidence','1'); else localStorage.removeItem('global_show_low_confidence') } catch {} }, [showLowConfidence])
   const [chaosIcon, setChaosIcon] = useState<string | null>(null)
   const [divineIcon, setDivineIcon] = useState<string | null>(null)
   const [divineChaos, setDivineChaos] = useState<number | null>(null)
@@ -51,12 +53,27 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
   if (divineEntry?.icon) setDivineIcon(divineEntry.icon)
         if (divineEntry?.chaosEquivalent) setDivineChaos(divineEntry.chaosEquivalent)
         const now = Date.now()
-        setLastUpdated(now)
-        setNextRefresh(now + REFRESH_INTERVAL_MS)
+        // Immutable schedule origin logic
+        let origin: number
         try {
-          localStorage.setItem('currency_cache_data', JSON.stringify({ ts: now, league: selectedLeague, type, data }))
-          localStorage.setItem('global_last_updated', String(now))
-          localStorage.setItem('global_next_refresh', String(now + REFRESH_INTERVAL_MS))
+          const originStr = localStorage.getItem('global_schedule_origin')
+          if (originStr) {
+            const parsed = Number(originStr)
+            origin = !isNaN(parsed) ? parsed : now
+          } else {
+            origin = now
+            localStorage.setItem('global_schedule_origin', String(origin))
+          }
+        } catch { origin = now }
+        const slot = Math.floor((now - origin) / REFRESH_INTERVAL_MS)
+        const slotStart = origin + slot * REFRESH_INTERVAL_MS
+        const nextSlotStart = slotStart + REFRESH_INTERVAL_MS
+        setLastUpdated(slotStart)
+        setNextRefresh(nextSlotStart)
+        try {
+          localStorage.setItem('currency_cache_data', JSON.stringify({ ts: slotStart, league: selectedLeague, type, data }))
+          localStorage.setItem('global_last_updated', String(slotStart))
+          localStorage.setItem('global_next_refresh', String(nextSlotStart))
         } catch {}
       } catch (error) {
         if (!abort) {
@@ -84,7 +101,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
       const lastTs = Number(lastTsStr)
       const nextAllowed = lastTs + REFRESH_INTERVAL_MS
       const now = Date.now()
-      if (now < nextAllowed - 1500) { // schedule fetch at nextAllowed ONLY if we have cached data
+      if (now < nextAllowed - 1500) { // schedule fetch at nextAllowed ONLY if we have cached data (immutable schedule)
         setNextRefresh(nextAllowed)
         const timeout = setTimeout(()=> fetchCurrencyData(false), Math.max(0, nextAllowed - now))
         return ()=> { abort = true; clearTimeout(timeout) }

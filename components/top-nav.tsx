@@ -114,46 +114,48 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
   }
 
   return (
-    <nav className="top-nav" style={{position:'sticky',top:0,zIndex:50,background:'linear-gradient(90deg,#121212,#181818 40%,#1d1a14 95%)',borderBottom:'1px solid #2a2a2a',padding:'8px 16px',display:'flex',alignItems:'center',gap:28,backdropFilter:'blur(6px)'}}>
-      {/* Brand */}
-      <div style={{fontWeight:700,fontSize:'1rem',letterSpacing:'.5px',display:'flex',alignItems:'center',gap:6,marginRight:6}}>
+    <nav className="top-nav" style={{position:'sticky',top:0,zIndex:50,background:'linear-gradient(90deg,#121212,#181818 40%,#1d1a14 95%)',borderBottom:'1px solid #2a2a2a',padding:'8px 16px',display:'flex',alignItems:'center',gap:16,backdropFilter:'blur(6px)'}}>
+      {/* Brand stays left */}
+      <div style={{fontWeight:700,fontSize:'1rem',letterSpacing:'.5px',display:'flex',alignItems:'center',gap:6}}>
         <span style={{color:'var(--poe-gold, #c8aa6e)'}}>Spiritbocs</span>
         <span style={{opacity:.65}}>Tracker</span>
       </div>
-      {/* Timers moved directly after brand */}
-      <div style={{display:'flex',alignItems:'center',gap:14,fontSize:11,letterSpacing:.5,whiteSpace:'nowrap',padding:'2px 10px',borderRadius:20,background:'linear-gradient(120deg,#222,#1a1a1a)',border:'1px solid #2f2f2f',boxShadow:'0 0 0 1px rgba(255,255,255,0.04), inset 0 0 6px rgba(0,0,0,.6)'}}>
-        <div title="Time until next scheduled refresh (client-side)" style={{display:'flex',gap:4,alignItems:'center'}}>
-          <span style={{opacity:.55}}>Next</span><strong>{nextCountdown || '--:--'}</strong>
+      <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:18}}>
+        {/* Timers */}
+        <div style={{display:'flex',alignItems:'center',gap:14,fontSize:11,letterSpacing:.5,whiteSpace:'nowrap',padding:'2px 10px',borderRadius:20,background:'linear-gradient(120deg,#222,#1a1a1a)',border:'1px solid #2f2f2f',boxShadow:'0 0 0 1px rgba(255,255,255,0.04), inset 0 0 6px rgba(0,0,0,.6)'}}>
+          <div title="Time until next scheduled refresh (client-side)" style={{display:'flex',gap:4,alignItems:'center'}}>
+            <span style={{opacity:.55}}>Next</span><strong>{nextCountdown || '--:--'}</strong>
+          </div>
+          <div title="Age of last fetched currency dataset" style={{display:'flex',gap:4,alignItems:'center'}}>
+            <span style={{opacity:.55}}>Age</span><strong>{age || '0:00'}</strong>
+          </div>
         </div>
-        <div title="Age of last fetched currency dataset" style={{display:'flex',gap:4,alignItems:'center'}}>
-          <span style={{opacity:.55}}>Age</span><strong>{age || '0:00'}</strong>
+        {/* Selectors */}
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <select aria-label="Realm" value={realm} onChange={e=>onRealmChange(e.target.value as any)} style={selectStyle}>
+            <option value="pc">PC</option>
+            <option value="xbox">Xbox</option>
+            <option value="sony">PlayStation</option>
+          </select>
+          <select aria-label="League" value={league} onChange={e=>onLeagueChange(e.target.value)} style={selectStyle} disabled={loadingLeagues || leagues.length===0}>
+            {loadingLeagues && <option>Loading...</option>}
+            {!loadingLeagues && leagues.map(l=> <option key={l.id} value={l.id}>{l.id}{l.category?.current ? ' *':''}</option>)}
+          </select>
         </div>
-      </div>
-      {/* Realm & League selectors */}
-      <div style={{display:'flex',alignItems:'center',gap:12,marginLeft:4}}>
-  <select aria-label="Realm" value={realm} onChange={e=>onRealmChange(e.target.value as any)} style={selectStyle}>
-          <option value="pc">PC</option>
-          <option value="xbox">Xbox</option>
-          <option value="sony">PlayStation</option>
-        </select>
-  <select aria-label="League" value={league} onChange={e=>onLeagueChange(e.target.value)} style={selectStyle} disabled={loadingLeagues || leagues.length===0}>
-          {loadingLeagues && <option>Loading...</option>}
-          {!loadingLeagues && leagues.map(l=> <option key={l.id} value={l.id}>{l.id}{l.category?.current ? ' *':''}</option>)}
-        </select>
-      </div>
-      {/* Auth Section */}
-      <div style={{display:'flex',alignItems:'center',gap:12,marginLeft:24}}>
-        {loadingAuth ? (
-          <span style={{fontSize:12,opacity:.7}}>Checking auth...</span>
-        ) : !isAuth ? (
-          <button onClick={handleLogin} disabled={!envReady} style={btnStylePrimary}>Connect</button>
-        ) : (
-          <>
-            <span style={{fontSize:12,background:'linear-gradient(90deg,#2d2214,#3b2c17)',padding:'4px 10px',borderRadius:20,border:'1px solid #5a4224',color:'#eac07c',boxShadow:'0 0 0 1px rgba(0,0,0,.4), inset 0 0 4px rgba(255,255,255,0.05)'}}>{accountName || 'Account'}</span>
-            <button onClick={handleLogout} style={btnStyle}>Disconnect</button>
-          </>
-        )}
-        <a href="https://discord.com/users/625796542456004639" target="_blank" rel="noopener noreferrer" style={btnStyle}>Support</a>
+        {/* Auth */}
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          {loadingAuth ? (
+            <span style={{fontSize:12,opacity:.7}}>Checking auth...</span>
+          ) : !isAuth ? (
+            <button onClick={handleLogin} disabled={!envReady} style={btnStylePrimary}>Connect</button>
+          ) : (
+            <>
+              <span style={{fontSize:12,background:'linear-gradient(90deg,#2d2214,#3b2c17)',padding:'4px 10px',borderRadius:20,border:'1px solid #5a4224',color:'#eac07c',boxShadow:'0 0 0 1px rgba(0,0,0,.4), inset 0 0 4px rgba(255,255,255,0.05)'}}>{accountName || 'Account'}</span>
+              <button onClick={handleLogout} style={btnStyle}>Disconnect</button>
+            </>
+          )}
+          <a href="https://discord.com/users/625796542456004639" target="_blank" rel="noopener noreferrer" style={btnStyle}>Support</a>
+        </div>
       </div>
     </nav>
   )

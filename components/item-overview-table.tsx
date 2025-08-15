@@ -12,7 +12,7 @@ interface ItemOverviewTableProps { league: string; realm?: string; type: string;
 export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverviewTableProps) {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(()=> (typeof window!=='undefined' ? (localStorage.getItem(`global_search_${type}`) || '') : ''))
   const [mode, setMode] = useState<'buy'|'sell'>(()=> (typeof window!=='undefined' && (localStorage.getItem('global_trade_mode') as any)) || 'buy')
   const router = useRouter()
   const [tooltip, setTooltip] = useState<{ x:number; y:number; row:any; spark:number[]; change7d:number; change24h:number } | null>(null)
@@ -31,6 +31,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
     return () => { cancelled = true }
   }, [league, type, realm])
 
+  useEffect(()=>{ try { localStorage.setItem(`global_search_${type}`, search) } catch {} }, [search, type])
   const filtered = data.filter(l => !search || (l.name || l.baseType || l.currencyTypeName || '').toLowerCase().includes(search.toLowerCase()))
   // Capture chaos / divine icons & ratio for price chain
   const chaosEntry = filtered.find(l => (l.currencyTypeName === 'Chaos Orb' || l.name === 'Chaos Orb'))
