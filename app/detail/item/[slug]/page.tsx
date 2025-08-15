@@ -1,6 +1,7 @@
 "use client"
 import { Sparkline } from '@/components/sparkline'
 import { poeApi } from '@/lib/poe-api'
+import { WikiContent } from '@/components/wiki-content'
 import { useEffect, useState, useMemo } from 'react'
 import { useSearchParams, useParams, useRouter } from 'next/navigation'
 
@@ -192,6 +193,7 @@ export default function ItemDetailPage() {
             </div>
             <div style={{marginTop:20,fontSize:11,opacity:.45}}>Longer timeframes coming soon (needs history endpoint).</div>
           </div>
+          <WikiContent title={item.name || item.baseType || item.currencyTypeName || ''} />
         </div>
 
         {/* RIGHT: Item Information & Live Listings */}
