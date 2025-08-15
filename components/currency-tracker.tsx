@@ -482,7 +482,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                         const want = mode === 'buy' ? slug : base
                         const url = buildExchangeUrl(selectedLeague, have, want)
                         const tooltip = `${mode === 'buy' ? 'Buy' : 'Sell'} via pathofexile.com (${have} -> ${want})`
-                        return <a href={url} target="_blank" rel="noopener noreferrer" className="trade-btn" title={tooltip}>Trade ↗</a>
+                        return <a href={url} target="_blank" rel="noopener noreferrer" className="trade-icon-btn" title={tooltip}>↗</a>
                       })()}
                     </td>
                   </tr>
