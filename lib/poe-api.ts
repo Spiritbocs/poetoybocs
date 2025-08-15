@@ -176,6 +176,7 @@ interface CharacterSummary {
   ascendancyClass?: number
   lastActive?: string
 }
+export type { CharacterSummary }
 
 class PoEAPI {
   private baseUrl = "https://api.pathofexile.com"
@@ -405,14 +406,48 @@ private oauthConfig: OAuthConfig = {
       // PoE character endpoint (OAuth). If CORS issues arise, we'll proxy later.
       // Using character-window legacy endpoint since it includes level/league.
       const qs = accountName ? `?accountName=${encodeURIComponent(accountName)}` : ""
-      const res = await this.makeAuthenticatedRequest(`/character-window/get-characters${qs}`)
-      if (!res.ok) {
-        console.warn("Characters fetch failed", res.status, res.statusText)
-        return null
+      // We will attempt several endpoints because the docs / deployment sometimes differ.
+      const endpoints = [
+        `/character-window/get-characters${qs}`,
+        `/profile/characters${qs}`,
+      ]
+      let data: any = null
+      let lastStatus: number | null = null
+      for (const ep of endpoints) {
+        try {
+          const res = await this.makeAuthenticatedRequest(ep)
+          lastStatus = res.status
+          if (!res.ok) {
+            console.warn('Character endpoint not ok', ep, res.status)
+            continue
+          }
+          const j = await res.json()
+            if (Array.isArray(j)) { data = j; break }
+            if (Array.isArray(j?.characters)) { data = j.characters; break }
+            console.warn('Character endpoint returned unexpected payload shape', ep)
+        } catch (e) {
+          console.warn('Character endpoint fetch error', ep, (e as any)?.message)
+        }
       }
-      const data = await res.json()
-      if (!Array.isArray(data)) {
-        console.warn("Unexpected characters payload", data)
+      // Fallback: try www.pathofexile.com legacy domain directly if still no data
+      if (!data && accountName) {
+        const altUrl = `https://www.pathofexile.com/character-window/get-characters${qs}`
+        try {
+          const res = await fetch(altUrl, {
+            headers: { Authorization: this.authToken ? `Bearer ${this.authToken.access_token}` : '' },
+            cache: 'no-cache',
+          })
+          lastStatus = res.status
+          if (res.ok) {
+            const j = await res.json()
+            if (Array.isArray(j)) data = j
+          }
+        } catch (e) {
+          console.warn('Legacy domain character fetch failed', (e as any)?.message)
+        }
+      }
+      if (!data) {
+        console.warn('All character fetch attempts failed', { lastStatus })
         return null
       }
       // Normalize
@@ -429,13 +464,13 @@ private oauthConfig: OAuthConfig = {
         try { localStorage.setItem('poe_characters', JSON.stringify(this.characters)) } catch {}
       }
       // Auto-select previous or first
-      if (!this.selectedCharacter && this.characters.length) {
+    if (!this.selectedCharacter && this.characters && this.characters.length) {
         const persisted = typeof window !== 'undefined' ? localStorage.getItem('poe_selected_character') : null
         if (persisted) {
-          const found = this.characters.find(c=>c.name===persisted)
-          this.selectedCharacter = found || this.characters[0]
+      const found = this.characters?.find(c=>c.name===persisted)
+      this.selectedCharacter = found || (this.characters ? this.characters[0] : null)
         } else {
-          this.selectedCharacter = this.characters[0]
+      this.selectedCharacter = this.characters ? this.characters[0] : null
         }
       }
       return this.characters

@@ -67,6 +67,16 @@ export function AuthStatus() {
   const ascName = selectedChar?.class || undefined
   const avatarUrl = ascName ? poeApi.getAscendancyIcon(ascName) : null
 
+  const retryCharacters = async () => {
+    setCharLoading(true)
+    const chars = await poeApi.getCharacters(true)
+    if (chars) {
+      setCharacters(chars)
+      setSelectedChar(poeApi.getSelectedCharacter())
+    }
+    setCharLoading(false)
+  }
+
   if (isLoading) {
     return (
       <div className="card">
@@ -124,7 +134,12 @@ export function AuthStatus() {
                 </div>
               </>
             ) : (
-              <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>{charLoading ? 'Loading characters...' : 'No characters found'}</div>
+              <div style={{ fontSize: '0.7rem', opacity: 0.7, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {charLoading ? 'Loading characters...' : 'No characters found'}
+                {!charLoading && (
+                  <button onClick={retryCharacters} className="btn btn-sm btn-secondary" style={{ fontSize: '0.6rem', padding: '2px 6px', alignSelf: 'flex-start' }}>↻ Retry</button>
+                )}
+              </div>
             )}
             {characters && characters.length > 1 && (
               <select value={selectedChar?.name || ''} onChange={handleCharacterChange} style={{ marginTop: 4, fontSize: '0.7rem', width: '100%' }}>
