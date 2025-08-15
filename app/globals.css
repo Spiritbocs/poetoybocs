@@ -359,6 +359,18 @@ body {
 .sparkline-bg { fill:rgba(255,255,255,0.03); stroke:rgba(255,255,255,0.08); }
 .sparkline-box svg { display:block; }
 
+/* Icon buttons (wiki + trade share base style) */
+.icon-btn { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; background:#272727; color:#d5d5d5; border:1px solid #3a3a3a; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600; letter-spacing:.4px; transition:background .12s, color .12s, border-color .12s; }
+.icon-btn:hover { background:#323232; color:#fff; border-color:#4a4a4a; }
+.icon-btn:focus { outline:1px solid #b58235; }
+.icon-btn:active { transform:translateY(1px); }
+
+/* Trade icon overrides (keep prior teal tone) */
+.trade-icon-btn { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; background:#1e2f31; color:#8eead2; border:1px solid #254f49; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; box-shadow:inset 0 0 0 1px rgba(255,255,255,.04), 0 1px 1px rgba(0,0,0,.5); transition:background .12s, color .12s, box-shadow .12s; }
+.trade-icon-btn:hover { background:#234446; color:#b5ffee; box-shadow:inset 0 0 0 1px rgba(255,255,255,.06), 0 1px 2px rgba(0,0,0,.6); }
+.trade-icon-btn:focus { outline:1px solid #3d8f7d; }
+.trade-icon-btn:active { transform:translateY(1px); }
+
 /* Top navigation select styling (force dark dropdown) */
 .top-nav select {
   background:linear-gradient(#2a2a2a,#202020);

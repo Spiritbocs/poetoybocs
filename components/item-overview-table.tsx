@@ -83,17 +83,17 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
     btn.textContent = '…'
     btn.disabled = true
     try {
-      const res = await fetch(`https://www.pathofexile.com/api/trade/search/${encodeURIComponent(league)}`, {
+      const res = await fetch(`/api/trade/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(query)
+        body: JSON.stringify({ league, query })
       })
       if (!res.ok) throw new Error('search_failed')
       const json = await res.json()
       if (json?.id) {
         const url = `https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}/${json.id}`
         window.open(url, '_blank', 'noopener,noreferrer')
-      }
+      } else throw new Error('no_id')
     } catch (e) {
       console.warn('Trade search failed', e)
       btn.textContent = 'x'
@@ -155,7 +155,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
                         {l.icon && <img src={l.icon} alt={name} title={name} style={{width:40,height:40}} />}
                         <span className="font-medium" style={{lineHeight:1}}>{name}</span>
                       </div>
-                      <a href={buildWikiUrl(name)} target="_blank" rel="noopener noreferrer" className="badge wiki-badge" style={{ textTransform:'lowercase', marginLeft:'auto' }} title="Open PoE Wiki">wiki ↗</a>
+                      <a href={buildWikiUrl(name)} target="_blank" rel="noopener noreferrer" className="icon-btn" style={{ marginLeft:'auto' }} title="Open PoE Wiki">W</a>
                     </div>
                   </td>
                   <td className="price-cell">

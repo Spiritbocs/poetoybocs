@@ -360,10 +360,10 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                           href={buildWikiUrl(currency.currencyTypeName)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="badge wiki-badge"
-                          style={{ textTransform: 'lowercase', marginLeft:'auto' }}
+                          className="icon-btn"
+                          style={{ marginLeft:'auto' }}
                           title="Open PoE Wiki"
-                        >wiki ↗</a>
+                        >W</a>
                       </div>
                     </td>
                     <td className="price-cell">
