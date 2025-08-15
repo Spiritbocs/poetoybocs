@@ -10,12 +10,13 @@ export default function ItemDetailPage() {
   const router = useRouter()
   const league = searchParams.get('league') || 'Mercenaries'
   const type = searchParams.get('type') || 'UniqueWeapon'
+  const realm = searchParams.get('realm') || 'pc'
   const [item, setItem] = useState<any | null>(null)
   useEffect(()=>{
     let cancelled = false
     ;(async()=>{
       try {
-        const lines = await poeApi.getItemOverview(league, type, 'pc')
+  const lines = await poeApi.getItemOverview(league, type, realm)
         const found = lines.find((l:any)=> (
           (l.detailsId && l.detailsId===params.slug) ||
           ((l.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-')===params.slug) ||

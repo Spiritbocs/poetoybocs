@@ -405,7 +405,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                     onMouseLeave={()=> setTooltip(null)}
                     onClick={()=>{
                       const slug = currency.detailsId || currency.currencyTypeName.replace(/[^a-z0-9]+/gi,'-').toLowerCase()
-                      router.push(`/detail/currency/${slug}`)
+                      router.push(`/detail/currency/${slug}?league=${encodeURIComponent(selectedLeague)}&type=${encodeURIComponent(type)}&realm=${encodeURIComponent(realm)}`)
                     }}
                     style={{cursor:'pointer'}}
                   >

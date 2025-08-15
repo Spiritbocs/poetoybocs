@@ -149,7 +149,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
                   onMouseLeave={()=> setTooltip(null)}
                   onClick={()=>{
                     const slug = (l.detailsId || name).toLowerCase().replace(/[^a-z0-9]+/g,'-')
-                    router.push(`/detail/item/${slug}`)
+                    router.push(`/detail/item/${slug}?league=${encodeURIComponent(league)}&type=${encodeURIComponent(type)}&realm=${encodeURIComponent(realm)}`)
                   }}
                 >
                   <td className="sticky-col">

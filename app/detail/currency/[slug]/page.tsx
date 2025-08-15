@@ -8,13 +8,14 @@ export default function CurrencyDetailPage() {
   const searchParams = useSearchParams()
   const params = useParams() as { slug: string }
   const league = searchParams.get('league') || 'Mercenaries'
+  const realm = searchParams.get('realm') || 'pc'
   const router = useRouter()
   const [currency, setCurrency] = useState<any | null>(null)
   useEffect(()=>{
     let cancelled = false
     ;(async()=>{
       try {
-        const data = await poeApi.getCurrencyData(league, 'Currency', 'pc')
+  const data = await poeApi.getCurrencyData(league, 'Currency', realm)
         const found = data.find(c=> c.detailsId === params.slug || c.currencyTypeName.toLowerCase().replace(/[^a-z0-9]+/g,'-')===params.slug)
         if (!cancelled) setCurrency(found || null)
       } catch { if (!cancelled) setCurrency(null) }
