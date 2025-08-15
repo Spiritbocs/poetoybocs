@@ -16,15 +16,15 @@ export async function POST(request: Request) {
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json",
       },
-body: new URLSearchParams({
-  grant_type: "authorization_code",
-  client_id: "poetoybocs",
-  client_secret: "0qOAktMWmksl", // <-- UPDATED SECRET
-  code: code,
-  redirect_uri: "https://poetoybocs.vercel.app/oauth/callback", // <-- YOUR URI
-  code_verifier: codeVerifier,
-  scope: "account:profile", // <-- ONLY PROFILE
-}),
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: process.env.NEXT_PUBLIC_POE_CLIENT_ID || "",
+        client_secret: process.env.POE_CLIENT_SECRET || "",
+        code: code,
+        redirect_uri: process.env.NEXT_PUBLIC_POE_REDIRECT_URI || "",
+        code_verifier: codeVerifier,
+        scope: "account:profile",
+      }),
     })
 
     if (!tokenResponse.ok) {

@@ -173,10 +173,10 @@ class PoEAPI {
   private oauthBaseUrl = "https://www.pathofexile.com"
 
 private oauthConfig: OAuthConfig = {
-  clientId: "poetoybocs",
-  clientSecret: "0qOAktMWmksl", // TODO: move to server env
-  redirectUri: "https://poetoybocs.vercel.app/oauth/callback",
-  scopes: ["account:profile"], // minimal scope for username display
+  clientId: process.env.NEXT_PUBLIC_POE_CLIENT_ID || "",
+  clientSecret: process.env.POE_CLIENT_SECRET || "",
+  redirectUri: process.env.NEXT_PUBLIC_POE_REDIRECT_URI || "",
+  scopes: ["account:profile"],
 }
 
   // Cache for API responses
