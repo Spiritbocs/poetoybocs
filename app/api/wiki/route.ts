@@ -15,27 +15,47 @@ export async function GET(req: NextRequest) {
     return new Response(cached.html, { status:200, headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'public, max-age=3600'}})
   }
   try {
-    const upstream = await fetch(`https://www.poewiki.net/wiki/${encodeURIComponent(title)}`, { headers:{ 'User-Agent':'poetoybocs/1.0 (+github)'} })
-    if (!upstream.ok) return new Response('Upstream fail', { status: 502 })
-    const text = await upstream.text()
-    // Extract main content
-    const mainMatch = text.match(/<div id="mw-content-text"[\s\S]*?<div class="printfooter">/)
-    if (!mainMatch) return new Response('Content not found', { status: 404 })
-    let main = mainMatch[0]
-    // Remove scripts/styles/navboxes/tables of contents beyond first
-    main = main.replace(/<script[\s\S]*?<\/script>/gi,'')
-      .replace(/<style[\s\S]*?<\/style>/gi,'')
-      .replace(/<table class="infobox[\s\S]*?<\/table>/i,'') // remove side infobox (we'll display metrics ourselves)
-      .replace(/<div id="toc"[\s\S]*?<\/div>/i,'')
-      .replace(/class="(?:mw-editsection|noprint|navbox)[^"]*"[\s\S]*?<\/div>/gi,'')
-      .replace(/<!--[^]*?-->/g,'')
-    // Keep only first ~25k chars to avoid bloat
-    if (main.length > 25000) main = main.slice(0,25000) + '<p><em>[Truncated]</em></p>'
-    // Basic sanitization: strip on* handlers
-    main = main.replace(/ on[a-z]+="[^"]*"/gi,'')
-    cache.set(key,{ ts:Date.now(), html: main })
-    return new Response(main, { status:200, headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'public, max-age=3600'}})
+    const fetchWiki = async(): Promise<string|null> => {
+      try {
+        const upstream = await fetch(`https://www.poewiki.net/wiki/${encodeURIComponent(title)}`, { headers:{ 'User-Agent':'poetoybocs/1.0 (+github)'} })
+        if (!upstream.ok) return null
+        const text = await upstream.text()
+        // Broad extraction for MediaWiki main content
+        const mainMatch = text.match(/<div id="mw-content-text"[\s\S]*?<div class="printfooter">/) || text.match(/<div id="mw-content-text"[\s\S]*?<\/div>\s*<div id="catlinks"/)
+        if (!mainMatch) return null
+        let main = mainMatch[0]
+        main = main.replace(/<script[\s\S]*?<\/script>/gi,'')
+          .replace(/<style[\s\S]*?<\/style>/gi,'')
+          .replace(/<!--[^]*?-->/g,'')
+        return main
+      } catch { return null }
+    }
+    const fetchPoeDb = async(): Promise<string|null> => {
+      try {
+        const resp = await fetch(`https://poedb.tw/us/${encodeURIComponent(title)}`, { headers:{ 'User-Agent':'poetoybocs/1.0 (+github)'} })
+        if (!resp.ok) return null
+        const html = await resp.text()
+        // Attempt to extract central content region (poedb uses <main id="main"> or container div)
+        const match = html.match(/<main[^>]*>[\s\S]*?<\/main>/i) || html.match(/<div id="wrapper"[\s\S]*?<\/div>\s*<footer/i)
+        if (!match) return null
+        let block = match[0]
+        block = block.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<!--[^]*?-->/g,'')
+        return `<div class="poedb-source">${block}</div>`
+      } catch { return null }
+    }
+
+    let content = await fetchWiki()
+    if (!content) content = await fetchWiki() // retry once
+    if (!content) content = await fetchPoeDb()
+    if (!content) content = `<p>Wiki content unavailable right now.</p>`
+
+    // Trim & sanitize
+    if (content.length > 30000) content = content.slice(0,30000) + '<p><em>[Truncated]</em></p>'
+    content = content.replace(/ on[a-z]+="[^"]*"/gi,'')
+    cache.set(key,{ ts:Date.now(), html: content })
+    return new Response(content, { status:200, headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'public, max-age=3600'}})
   } catch (e:any) {
-    return new Response('Error '+(e?.message||'unknown'), { status:500 })
+    const fallback = '<p>Wiki content unavailable.</p>'
+    return new Response(fallback, { status:200, headers:{'Content-Type':'text/html; charset=utf-8'}})
   }
 }

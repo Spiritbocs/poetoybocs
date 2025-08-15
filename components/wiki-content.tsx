@@ -16,7 +16,19 @@ export function WikiContent({ title }: WikiContentProps) {
       setHtml(text)
     } catch (e:any) { setError('Wiki load failed') } finally { setLoading(false) }
   }
-  useEffect(()=>{ load() }, [title])
+  useEffect(()=>{ 
+    let active = true
+    let attempts = 0
+    const run = async()=>{
+      while(active && attempts < 3 && !html){
+        attempts++
+        await load()
+        if(!html) await new Promise(r=>setTimeout(r, attempts*800))
+      }
+    }
+    run(); return ()=>{ active=false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title])
   const truncated = !expanded && html && html.length > 15000
   return (
     <div style={{background:'#121212',border:'1px solid #272727',borderRadius:8,padding:'18px 22px',marginTop:28}}>
@@ -25,7 +37,6 @@ export function WikiContent({ title }: WikiContentProps) {
         {loading && <div style={{fontSize:12,opacity:.6}}>Loading…</div>}
         {error && <div style={{fontSize:12,color:'#f87171'}}>{error}</div>}
         <div style={{marginLeft:'auto',display:'flex',gap:8}}>
-          <button onClick={load} disabled={loading} style={{background:'#1e1e1e',border:'1px solid #333',padding:'4px 10px',color:'#ccc',fontSize:11,borderRadius:4,cursor:'pointer'}}>Reload</button>
           {html && html.length>15000 && <button onClick={()=>setExpanded(e=>!e)} style={{background:'#1e1e1e',border:'1px solid #333',padding:'4px 10px',color:'#ccc',fontSize:11,borderRadius:4,cursor:'pointer'}}>{expanded? 'Collapse':'Expand'}</button>}
         </div>
       </div>

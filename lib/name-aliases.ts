@@ -7,6 +7,14 @@ export const ITEM_ALIASES: Record<string,string[]> = {
   'mageblood': ['Mageblood'],
   'divine-orb': ['Divine_Orb'],
   'chaos-orb': ['Chaos_Orb'],
+  'exalted-orb': ['Exalted_Orb'],
+  'mirror-of-kalandra': ['Mirror_of_Kalandra','Mirror'],
+  'ancient-orb': ['Ancient_Orb'],
+  'blessed-orb': ['Blessed_Orb'],
+  'orb-of-alchemy': ['Orb_of_Alchemy'],
+  'orb-of-fusing': ['Orb_of_Fusing'],
+  'orb-of-scouring': ['Orb_of_Scouring'],
+  'vaal-orb': ['Vaal_Orb'],
 }
 
 export function slugifyName(name: string): string {
