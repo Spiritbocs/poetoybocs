@@ -1,10 +1,10 @@
-"use client"
+  "use client"
 
-import type React from "react"
+  import type React from "react"
 
-import { useState, useCallback } from "react"
-import { poeApi, type TradeItem } from "@/lib/poe-api"
-
+  import { useState, useEffect } from "react"
+  import { poeApi, type TradeItem } from "@/lib/poe-api"
+  
 export function ItemPriceChecker() {
   // Simple name search (legacy fallback)
   const [searchTerm, setSearchTerm] = useState("")
@@ -18,6 +18,8 @@ export function ItemPriceChecker() {
   const [priceSummary, setPriceSummary] = useState<{min:number; max:number; median:number; average:number; trimmedAverage:number; suggested:number; count:number; confidence:number} | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tradeSearchId, setTradeSearchId] = useState<string | null>(null)
+  const [poePriceResult, setPoePriceResult] = useState<{min: number; max: number; currency: string; confidence: number} | null>(null)
+  const [poePriceLoading, setPoePriceLoading] = useState(false)
   const [lastQuery, setLastQuery] = useState<any | null>(null)
 
   const persistMode = (m:'simple'|'clipboard')=>{ setMode(m); try{ localStorage.setItem('price_checker_mode',m)}catch{} }
@@ -46,8 +48,11 @@ export function ItemPriceChecker() {
       if (!rawClipboard.trim()) { setError('Paste item text first'); return }
       const p = parseClipboard(rawClipboard)
       setParsed(p)
-      if (!p || !p.baseType) { setError('Could not parse base type'); return }
+      if (!p || !p.baseType) { setError('Could not parse item'); return }
       setLoading(true)
+      // Start poeprices.info request in parallel
+      fetchPoePriceEstimate(rawClipboard, selectedLeague)
+      
       try {
   const query = buildTradeQueryFromParsed(p)
   setLastQuery(query)
@@ -123,6 +128,40 @@ export function ItemPriceChecker() {
       if (/^[+\-].+|\d+%/i.test(l)) obj.explicits.push(l)
     }
     return obj
+  }
+
+  const fetchPoePriceEstimate = async (itemText: string, league: string) => {
+    setPoePriceResult(null)
+    setPoePriceLoading(true)
+    try {
+      const response = await fetch('/api/poeprices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemText, league })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const data = await response.json()
+      
+      // Handle successful response from poeprices.info
+      if (data && data.min && data.max && data.currency) {
+        setPoePriceResult({
+          min: parseFloat(data.min),
+          max: parseFloat(data.max),
+          currency: data.currency,
+          confidence: data.confidence || 0
+        })
+      } else if (data.error) {
+        console.warn('PoePrice API returned error:', data.error)
+      }
+    } catch (e) {
+      console.error('Failed to fetch poeprices estimate:', e)
+    } finally {
+      setPoePriceLoading(false)
+    }
   }
 
   const largestLinkGroup = (socketStr:string): number => {
@@ -256,6 +295,7 @@ export function ItemPriceChecker() {
           <div style={{display:'flex',gap:12,alignItems:'center'}}>
             <button onClick={handleSearch} disabled={loading || !rawClipboard.trim()} className="btn btn-accent">{loading? 'Pricing…':'Price It'}</button>
             {priceSummary && <div style={{fontSize:12,opacity:.7}}>Listings: {priceSummary.count} • Suggested: {priceSummary.suggested.toFixed(1)}c • Med {priceSummary.median.toFixed(1)} • Avg {priceSummary.average.toFixed(1)} • Conf {priceSummary.confidence}%</div>}
+            {!priceSummary && poePriceResult && <div style={{fontSize:12,opacity:.7}}>PoePrice.info: {poePriceResult.min.toFixed(1)}-{poePriceResult.max.toFixed(1)} {poePriceResult.currency} • Conf {poePriceResult.confidence}%</div>}
             {error && <div style={{fontSize:12,color:'#ff6a6a'}}>{error}</div>}
             {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#67bfff',textDecoration:'none'}}>Open Trade ↗</a>}
           </div>
@@ -282,10 +322,27 @@ export function ItemPriceChecker() {
                   <div><span style={{opacity:.55}}>Avg</span><div style={{fontWeight:600}}>{priceSummary.average.toFixed(1)}</div></div>
                   <div><span style={{opacity:.55}}>Max</span><div style={{fontWeight:600}}>{priceSummary.max.toFixed(1)}</div></div>
                   <div><span style={{opacity:.55}}>Suggested</span><div style={{fontWeight:600,color:'#57d977'}}>{priceSummary.suggested.toFixed(1)}c</div></div>
+                  {poePriceResult && <div><span style={{opacity:.55}}>PoePrice</span><div style={{fontWeight:600,color:'#67bfff'}}>{poePriceResult.min.toFixed(1)}-{poePriceResult.max.toFixed(1)}{poePriceResult.currency}</div></div>}
                 </div>
                 <div style={{marginLeft:'auto',fontSize:11,opacity:.5,display:'flex',gap:12,alignItems:'center'}}>
                   <span>Heuristic • Conf {priceSummary.confidence}% • Trim {priceSummary.trimmedAverage.toFixed(1)}</span>
                   {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#67bfff',textDecoration:'none'}}>Trade ↗</a>}
+                </div>
+              </div>
+            </div>
+          )}
+          {!priceSummary && poePriceResult && (
+            <div style={{background:'#141414',border:'1px solid #2a2a2a',padding:'16px 18px',borderRadius:8,marginTop:12}}>
+              <div style={{display:'flex',alignItems:'center',gap:24,flexWrap:'wrap'}}>
+                <div style={{fontSize:13,letterSpacing:.5,opacity:.85}}>PoePrice.info Estimate ({poePriceResult.currency})</div>
+                <div style={{display:'flex',gap:16,fontSize:13}}>
+                  <div><span style={{opacity:.55}}>Min</span><div style={{fontWeight:600}}>{poePriceResult.min.toFixed(1)}</div></div>
+                  <div><span style={{opacity:.55}}>Max</span><div style={{fontWeight:600}}>{poePriceResult.max.toFixed(1)}</div></div>
+                  <div><span style={{opacity:.55}}>Suggested</span><div style={{fontWeight:600,color:'#57d977'}}>{((poePriceResult.min + poePriceResult.max)/2).toFixed(1)} {poePriceResult.currency}</div></div>
+                </div>
+                <div style={{marginLeft:'auto',fontSize:11,opacity:.5}}>
+                  <span>ML-based • Conf {poePriceResult.confidence}%</span>
+                  <div style={{fontSize:10,marginTop:4}}>Data provided by poeprices.info</div>
                 </div>
               </div>
             </div>
