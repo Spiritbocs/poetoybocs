@@ -70,7 +70,7 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
   }
 
   return (
-    <nav style={{position:'sticky',top:0,zIndex:50,background:'#111',borderBottom:'1px solid #222',padding:'8px 16px',display:'flex',alignItems:'center',gap:24}}>
+    <nav style={{position:'sticky',top:0,zIndex:50,background:'linear-gradient(90deg,#121212,#181818 40%,#1d1a14 95%)',borderBottom:'1px solid #2a2a2a',padding:'8px 16px',display:'flex',alignItems:'center',gap:24,backdropFilter:'blur(6px)'}}>
       {/* Brand */}
       <div style={{fontWeight:700,fontSize:'1rem',letterSpacing:'.5px',display:'flex',alignItems:'center',gap:6}}>
         <span style={{color:'var(--poe-gold, #c8aa6e)'}}>Spiritbocs</span>
@@ -80,12 +80,12 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
       <div style={{flex:1}} />
       {/* Realm & League selectors */}
       <div style={{display:'flex',alignItems:'center',gap:12}}>
-        <select aria-label="Realm" value={realm} onChange={e=>onRealmChange(e.target.value as any)} style={selectStyle}>
+  <select aria-label="Realm" value={realm} onChange={e=>onRealmChange(e.target.value as any)} style={selectStyle}>
           <option value="pc">PC</option>
           <option value="xbox">Xbox</option>
           <option value="sony">PlayStation</option>
         </select>
-        <select aria-label="League" value={league} onChange={e=>onLeagueChange(e.target.value)} style={selectStyle} disabled={loadingLeagues || leagues.length===0}>
+  <select aria-label="League" value={league} onChange={e=>onLeagueChange(e.target.value)} style={selectStyle} disabled={loadingLeagues || leagues.length===0}>
           {loadingLeagues && <option>Loading...</option>}
           {!loadingLeagues && leagues.map(l=> <option key={l.id} value={l.id}>{l.id}{l.category?.current ? ' *':''}</option>)}
         </select>
@@ -98,7 +98,7 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
           <button onClick={handleLogin} disabled={!envReady} style={btnStylePrimary}>Connect</button>
         ) : (
           <>
-            <span style={{fontSize:12,background:'#222',padding:'4px 8px',borderRadius:4,border:'1px solid #333'}}>{accountName || 'Account'}</span>
+            <span style={{fontSize:12,background:'linear-gradient(90deg,#2d2214,#3b2c17)',padding:'4px 10px',borderRadius:20,border:'1px solid #5a4224',color:'#eac07c',boxShadow:'0 0 0 1px rgba(0,0,0,.4), inset 0 0 4px rgba(255,255,255,0.05)'}}>{accountName || 'Account'}</span>
             <button onClick={handleLogout} style={btnStyle}>Disconnect</button>
           </>
         )}
@@ -109,24 +109,29 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
 }
 
 const selectStyle: React.CSSProperties = {
-  background:'#1b1b1b',
-  color:'#eee',
-  border:'1px solid #333',
-  padding:'4px 6px',
-  borderRadius:4,
-  fontSize:12
+  background:'linear-gradient(#2a2a2a,#202020)',
+  color:'#e4e4e4',
+  border:'1px solid #3d3d3d',
+  padding:'5px 8px',
+  borderRadius:6,
+  fontSize:12,
+  boxShadow:'0 1px 2px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,0.04)',
+  appearance:'none'
 }
 const btnStyle: React.CSSProperties = {
-  background:'#222',
-  color:'#ddd',
-  border:'1px solid #333',
-  padding:'4px 10px',
-  borderRadius:4,
+  background:'linear-gradient(#2b2b2b,#1f1f1f)',
+  color:'#d8d8d8',
+  border:'1px solid #3b3b3b',
+  padding:'5px 12px',
+  borderRadius:18,
   fontSize:12,
-  cursor:'pointer'
+  cursor:'pointer',
+  boxShadow:'0 1px 2px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.04)',
+  transition:'background .15s, color .15s, transform .15s'
 }
 const btnStylePrimary: React.CSSProperties = {
   ...btnStyle,
-  background:'linear-gradient(90deg,#70451b,#9d6a28)',
-  border:'1px solid #a07435'
+  background:'linear-gradient(90deg,#7d531f,#b47a2d)',
+  border:'1px solid #b58235',
+  color:'#ffe7b8'
 }

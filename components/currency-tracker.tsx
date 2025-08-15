@@ -356,15 +356,21 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                         {/* Divine -> Chaos -> Unit chain (hide divine if extremely small) */}
                         {(() => {
                           const divEq = currency.divineEquivalent
-                          const showDiv = divEq !== undefined && divEq > 0.005 && divEq < 1000 && currency.detailsId !== 'divine-orb'
+                          // Show divine for any sensible non-divine currency where ratio is >= 0.005 (always, no upper cap so mirrors still show)
+                          const showDiv = divEq !== undefined && divEq > 0.005 && currency.detailsId !== 'divine-orb'
                           const chaosEq = currency.chaosEquivalent
+                          const formatDiv = (v: number) => {
+                            if (v >= 1000) return formatShort(v)
+                            if (v >= 1) return v.toFixed(1).replace(/\.0$/, '')
+                            return v < 0.1 ? v.toFixed(3) : v.toFixed(2)
+                          }
                           if (mode === 'buy') {
                             return (
                               <>
                                 {showDiv && (
                                   <>
                                     <div className="grp divine-group" title="Divine equivalent">
-                                      <span className="num">{divEq! < 1 ? divEq!.toFixed(divEq! < 0.1 ? 3 : 2) : formatShort(divEq!)}</span>
+                                      <span className="num">{formatDiv(divEq!)}</span>
                                       {divineIcon && <img src={divineIcon} alt="Divine Orb" title="Divine Orb" />}
                                     </div>
                                     <div className="arrow">→</div>
@@ -397,7 +403,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                                   <>
                                     <div className="arrow">→</div>
                                     <div className="grp divine-group" title="Divine equivalent">
-                                      <span className="num">{divEq! < 1 ? divEq!.toFixed(divEq! < 0.1 ? 3 : 2) : formatShort(divEq!)}</span>
+                                      <span className="num">{formatDiv(divEq!)}</span>
                                       {divineIcon && <img src={divineIcon} alt="Divine Orb" title="Divine Orb" />}
                                     </div>
                                   </>
