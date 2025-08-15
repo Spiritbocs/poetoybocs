@@ -76,26 +76,35 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
     }
     return query
   }
+  // Cache of built search ids to avoid repeated network calls: key = league|type|name|base
+  const tradeIdCache = new Map<string,string>()
+  function cacheKey(line: any) {
+    return [league, line.name||'', line.baseType||'', line.currencyTypeName||''].join('|')
+  }
   async function openTrade(line: any, btn: HTMLButtonElement) {
     const query = buildItemTradeQuery(line)
     if (!query) return
+    const key = cacheKey(line)
     const original = btn.textContent
-    btn.textContent = '…'
-    btn.disabled = true
+    // Pre-open window to avoid popup blocker
+    const preload = window.open('about:blank','_blank','noopener,noreferrer')
+    if (tradeIdCache.has(key)) {
+      const id = tradeIdCache.get(key)!
+      preload?.location.replace(`https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}/${id}`)
+      return
+    }
+    btn.textContent = '…'; btn.disabled = true
     try {
-      const res = await fetch(`/api/trade/search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ league, query })
-      })
+      const res = await fetch(`/api/trade/search`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ league, query }) })
       if (!res.ok) throw new Error('search_failed')
       const json = await res.json()
       if (json?.id) {
-        const url = `https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}/${json.id}`
-        window.open(url, '_blank', 'noopener,noreferrer')
+        tradeIdCache.set(key, json.id)
+        preload?.location.replace(`https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}/${json.id}`)
       } else throw new Error('no_id')
     } catch (e) {
       console.warn('Trade search failed', e)
+      preload?.close()
       btn.textContent = 'x'
       setTimeout(()=>{ btn.textContent = original || '↗'; btn.disabled = false }, 1200)
       return
@@ -155,7 +164,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
                         {l.icon && <img src={l.icon} alt={name} title={name} style={{width:40,height:40}} />}
                         <span className="font-medium" style={{lineHeight:1}}>{name}</span>
                       </div>
-                      <a href={buildWikiUrl(name)} target="_blank" rel="noopener noreferrer" className="icon-btn" style={{ marginLeft:'auto' }} title="Open PoE Wiki">W</a>
+                      <a href={buildWikiUrl(name)} target="_blank" rel="noopener noreferrer" className="wiki-icon-btn" style={{ marginLeft:'auto' }} title="Open PoE Wiki">📜</a>
                     </div>
                   </td>
                   <td className="price-cell">

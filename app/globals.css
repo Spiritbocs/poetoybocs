@@ -371,6 +371,12 @@ body {
 .trade-icon-btn:focus { outline:1px solid #3d8f7d; }
 .trade-icon-btn:active { transform:translateY(1px); }
 
+/* Wiki icon button (gold themed) */
+.wiki-icon-btn { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; background:linear-gradient(#3a2f18,#2a2110); color:#e8d08a; border:1px solid #5a4a24; border-radius:8px; text-decoration:none; font-size:15px; font-weight:600; box-shadow:inset 0 0 0 1px rgba(255,255,255,.05), 0 1px 1px rgba(0,0,0,.5); transition:background .15s, color .15s, box-shadow .15s; }
+.wiki-icon-btn:hover { background:linear-gradient(#45371d,#322613); color:#ffe8a8; box-shadow:inset 0 0 0 1px rgba(255,255,255,.07), 0 1px 2px rgba(0,0,0,.6); }
+.wiki-icon-btn:focus { outline:1px solid #caa24e; }
+.wiki-icon-btn:active { transform:translateY(1px); }
+
 /* Top navigation select styling (force dark dropdown) */
 .top-nav select {
   background:linear-gradient(#2a2a2a,#202020);
