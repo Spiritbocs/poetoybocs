@@ -59,6 +59,15 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
 
   // Global timers (read-only; updated by currency tracker via localStorage)
   useEffect(()=>{
+    // Establish an immutable schedule origin if not already set (used only for reference / debugging)
+    try {
+      const origin = localStorage.getItem('global_schedule_origin')
+      const last = localStorage.getItem('global_last_updated')
+      if (!origin && last) {
+        localStorage.setItem('global_schedule_origin', last)
+      }
+    } catch {}
+
     const interval = setInterval(()=>{
       try {
         const lastStr = localStorage.getItem('global_last_updated')
@@ -66,12 +75,12 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
         const now = Date.now()
         if (lastStr) {
           const last = Number(lastStr)
-            if (!isNaN(last)) {
-              const diff = now - last
-              const m = Math.floor(diff/60000)
-              const s = Math.floor((diff%60000)/1000)
-              setAge(`${m}:${s.toString().padStart(2,'0')}`)
-            }
+          if (!isNaN(last)) {
+            const diff = now - last
+            const m = Math.floor(diff/60000)
+            const s = Math.floor((diff%60000)/1000)
+            setAge(`${m}:${s.toString().padStart(2,'0')}`)
+          }
         }
         if (nextStr) {
           const nxt = Number(nextStr)
@@ -105,21 +114,23 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
   }
 
   return (
-    <nav className="top-nav" style={{position:'sticky',top:0,zIndex:50,background:'linear-gradient(90deg,#121212,#181818 40%,#1d1a14 95%)',borderBottom:'1px solid #2a2a2a',padding:'8px 16px',display:'flex',alignItems:'center',gap:24,backdropFilter:'blur(6px)'}}>
+    <nav className="top-nav" style={{position:'sticky',top:0,zIndex:50,background:'linear-gradient(90deg,#121212,#181818 40%,#1d1a14 95%)',borderBottom:'1px solid #2a2a2a',padding:'8px 16px',display:'flex',alignItems:'center',gap:28,backdropFilter:'blur(6px)'}}>
       {/* Brand */}
-      <div style={{fontWeight:700,fontSize:'1rem',letterSpacing:'.5px',display:'flex',alignItems:'center',gap:6}}>
+      <div style={{fontWeight:700,fontSize:'1rem',letterSpacing:'.5px',display:'flex',alignItems:'center',gap:6,marginRight:6}}>
         <span style={{color:'var(--poe-gold, #c8aa6e)'}}>Spiritbocs</span>
         <span style={{opacity:.65}}>Tracker</span>
       </div>
-      {/* Center zone: global timers */}
-      <div style={{flex:1, display:'flex',alignItems:'center',gap:20}}>
-        <div style={{display:'flex',alignItems:'center',gap:12,fontSize:11,letterSpacing:.5}}>
-          <div title="Time until next scheduled refresh (client-side)" style={{display:'flex',gap:4}}><span style={{opacity:.55}}>Next</span><strong>{nextCountdown || '--:--'}</strong></div>
-          <div title="Age of last fetched currency dataset" style={{display:'flex',gap:4}}><span style={{opacity:.55}}>Age</span><strong>{age || '0:00'}</strong></div>
+      {/* Timers moved directly after brand */}
+      <div style={{display:'flex',alignItems:'center',gap:14,fontSize:11,letterSpacing:.5,whiteSpace:'nowrap',padding:'2px 10px',borderRadius:20,background:'linear-gradient(120deg,#222,#1a1a1a)',border:'1px solid #2f2f2f',boxShadow:'0 0 0 1px rgba(255,255,255,0.04), inset 0 0 6px rgba(0,0,0,.6)'}}>
+        <div title="Time until next scheduled refresh (client-side)" style={{display:'flex',gap:4,alignItems:'center'}}>
+          <span style={{opacity:.55}}>Next</span><strong>{nextCountdown || '--:--'}</strong>
+        </div>
+        <div title="Age of last fetched currency dataset" style={{display:'flex',gap:4,alignItems:'center'}}>
+          <span style={{opacity:.55}}>Age</span><strong>{age || '0:00'}</strong>
         </div>
       </div>
       {/* Realm & League selectors */}
-      <div style={{display:'flex',alignItems:'center',gap:12}}>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginLeft:4}}>
   <select aria-label="Realm" value={realm} onChange={e=>onRealmChange(e.target.value as any)} style={selectStyle}>
           <option value="pc">PC</option>
           <option value="xbox">Xbox</option>

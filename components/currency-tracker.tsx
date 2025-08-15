@@ -66,27 +66,31 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
       } finally { if (!abort) setLoading(false) }
     }
     // Read cache to guard against manual refresh hammering
+    let loadedFromCache = false
     try {
       const raw = localStorage.getItem('currency_cache_data')
       if (raw) {
         const parsed = JSON.parse(raw)
-        if (parsed.league === selectedLeague && parsed.type === type && Array.isArray(parsed.data)) {
+        if (parsed.league === selectedLeague && parsed.type === type && Array.isArray(parsed.data) && parsed.data.length) {
           setCurrencyData(parsed.data); setFilteredData(parsed.data)
           if (parsed.ts) { setLastUpdated(parsed.ts); setNextRefresh(parsed.ts + REFRESH_INTERVAL_MS) }
+          loadedFromCache = true
+          setLoading(false)
         }
       }
     } catch {}
     const lastTsStr = typeof window!=='undefined'? localStorage.getItem('global_last_updated') : null
-    if (lastTsStr) {
+    if (loadedFromCache && lastTsStr) {
       const lastTs = Number(lastTsStr)
       const nextAllowed = lastTs + REFRESH_INTERVAL_MS
       const now = Date.now()
-      if (now < nextAllowed - 1500) { // schedule fetch at nextAllowed
+      if (now < nextAllowed - 1500) { // schedule fetch at nextAllowed ONLY if we have cached data
         setNextRefresh(nextAllowed)
-        const timeout = setTimeout(()=> fetchCurrencyData(false), nextAllowed - now)
+        const timeout = setTimeout(()=> fetchCurrencyData(false), Math.max(0, nextAllowed - now))
         return ()=> { abort = true; clearTimeout(timeout) }
       }
     }
+    // No valid cache or interval elapsed -> immediate fetch
     fetchCurrencyData()
     const interval = setInterval(()=>fetchCurrencyData(true), REFRESH_INTERVAL_MS)
     return ()=>{ abort = true; clearInterval(interval) }
