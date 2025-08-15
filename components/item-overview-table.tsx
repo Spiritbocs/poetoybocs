@@ -54,36 +54,33 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
     return v < 0.1 ? v.toFixed(3) : v.toFixed(2)
   }
 
-  // Build PoE trade search query body (used by redirect URL builder)
+  // Build PoE trade search query body (client-side navigation; mimics poe.ninja formatting)
   function buildItemTradeQuery(line: any): any | null {
     const nmLower = (line.name || line.currencyTypeName || '').toLowerCase()
-    if (nmLower === 'chaos orb') return null // handled on currency tab
+    if (nmLower === 'chaos orb') return null
+    const rawName = (line.name || '').trim()
+    const rawBase = (line.baseType || '').trim()
+    const ctn = (line.currencyTypeName || '').trim()
     const query: any = { query: { status: { option: 'online' } }, sort: { price: 'asc' } }
-    const rawName = line.name && line.name.trim() ? line.name.trim() : ''
-    const rawBase = line.baseType && line.baseType.trim() ? line.baseType.trim() : ''
-    // Many poe.ninja lines use baseType for generic groups (e.g. Fossil, Scarab), keep name if unique-like (has spaces and capitalised words)
+    // Include dummy ilvl filter like poe.ninja (prevents some API caching quirks)
+    query.query.filters = { misc_filters: { filters: { ilvl: { min: 0, max: 0 } } } }
     if (rawName && rawBase && rawName !== rawBase) {
+      // Unique items (e.g. Headhunter Leather Belt)
       query.query.name = rawName
       query.query.type = rawBase
-    } else if (rawName) {
-      query.query.name = rawName
-    } else if (rawBase) {
-      query.query.type = rawBase
-    } else if (line.currencyTypeName) {
-      query.query.name = line.currencyTypeName
     } else {
-      return null
+      const chosen = rawBase || rawName || ctn
+      if (!chosen) return null
+      // Use type.option form for base-type style items (Fossils, Scarabs, Embers...)
+      query.query.type = { option: chosen }
     }
     return query
   }
-  // Build redirect URL to internal route that performs the search server-side then 302 redirects
-  function buildTradeRedirect(line: any): string | null {
+  function buildTradeUrl(line: any): string | null {
     const query = buildItemTradeQuery(line)
     if (!query) return null
-    const name = encodeURIComponent(line.name || '')
-    const base = encodeURIComponent(line.baseType || '')
-    const ctn = encodeURIComponent(line.currencyTypeName || '')
-    return `/api/trade/open?league=${encodeURIComponent(league)}&name=${name}&base=${base}&ctn=${ctn}`
+    const json = encodeURIComponent(JSON.stringify(query))
+    return `https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}?q=${json}`
   }
 
   if (loading) return <div className="loading"><div className="spinner"/>Loading {title}...</div>
@@ -183,7 +180,7 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
                   <td><Sparkline data={spark.slice(-24)} changeHint={change} /></td>
                   <td className={getTrendColor(change)} title={change !== undefined ? `${change.toFixed(2)}%` : '0%'}>{formatChange(change)}</td>
                   <td title={`Approximate listings: ${listed}`}>~{listed >=1000? `${Math.round(listed/100)/10}k`: listed}</td>
-                  <td>{(() => { const url = buildTradeRedirect(l); return url ? <a className="trade-icon-btn" href={url} target="_blank" rel="noopener noreferrer" title="Open trade search">↗</a> : null })()}</td>
+                  <td>{(() => { const url = buildTradeUrl(l); return url ? <a className="trade-icon-btn" href={url} target="_blank" rel="noopener noreferrer" title="Open trade search">↗</a> : null })()}</td>
                 </tr>
               )
             })}
