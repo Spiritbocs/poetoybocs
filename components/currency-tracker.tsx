@@ -265,28 +265,6 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
         {showLowConfidence && (
           <div className="low-conf-warning" role="alert">⚠️ <strong>Warning:</strong> Low confidence values will likely be misleading.</div>
         )}
-        <button
-          className="btn btn-sm"
-          onClick={()=> {
-            setLastUpdated(null)
-            ;(async()=>{
-              try {
-                const data = await poeApi.getCurrencyData(selectedLeague, type, realm)
-                setCurrencyData(data); setFilteredData(data)
-                const chaosEntry = data.find(d=>d.detailsId==='chaos-orb')
-                const divineEntry = data.find(d=>d.detailsId==='divine-orb')
-                setChaosIcon(chaosEntry?.icon||null)
-                setDivineIcon(divineEntry?.icon||null)
-                if (divineEntry?.chaosEquivalent) setDivineChaos(divineEntry.chaosEquivalent)
-                const now = Date.now()
-                setLastUpdated(now)
-                setNextRefresh(now + REFRESH_INTERVAL_MS)
-              } catch {/* ignore */}
-            })()
-          }}
-          title="Manual refresh (bypasses schedule)"
-          style={{background:'#222'}}
-        >Refresh</button>
         {lastUpdated && (
           <div style={{fontSize:11,opacity:.65}}>Updated {new Date(lastUpdated).toLocaleTimeString()}</div>
         )}
@@ -323,7 +301,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
         <table className="table">
           <thead>
             <tr>
-              <th className="sticky-col" style={{minWidth:200}}>Name</th>
+              <th className="sticky-col" style={{minWidth:240}}>Name</th>
               <th className="active-col" style={{minWidth:240}}>{mode === 'buy' ? 'Buying price' : 'Selling price'}</th>
               <th style={{width:90}}>Last 7 days</th>
               <th style={{width:70}}>Change</th>
@@ -355,57 +333,94 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
                 return (
                   <tr key={index}>
                     <td className="sticky-col">
-                      <div className="flex items-center gap-2">
-                        {currency.icon && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={currency.icon} alt="" title={currency.currencyTypeName} style={{ width: 40, height: 40 }} />
-                        )}
-                        <span className="font-medium" style={{ lineHeight: 1 }}>{currency.currencyTypeName}</span>
-                      </div>
-                    </td>
-                    <td className="price-cell">
-                      <div className={`price-grid no-divine`}> 
+                      <div className="flex items-center gap-2 justify-between" style={{width:'100%'}}>
+                        <div className="flex items-center gap-2">
+                          {currency.icon && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={currency.icon} alt="" title={currency.currencyTypeName} style={{ width: 40, height: 40 }} />
+                          )}
+                          <span className="font-medium" style={{ lineHeight: 1 }}>{currency.currencyTypeName}</span>
+                        </div>
                         <a
                           href={buildWikiUrl(currency.currencyTypeName)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="badge wiki-badge"
-                          style={{ textTransform: 'lowercase' }}
-                        >
-                          wiki ↗
-                        </a>
-                        {mode === 'buy' ? (
-                          <>
-                            <div className="grp chaos-group" title="Chaos equivalent">
-                              <span className="num">{formatShort(currency.chaosEquivalent)}</span>
-                              {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" />}
-                            </div>
-                            <div className="arrow">→</div>
-                            <div className="grp target-group" title="Unit price">
-                              <span className="num">1.0</span>
-                              {currency.icon && <img src={currency.icon} alt={currency.currencyTypeName} title={currency.currencyTypeName} />}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="grp target-group" title="Unit price">
-                              <span className="num">1.0</span>
-                              {currency.icon && <img src={currency.icon} alt={currency.currencyTypeName} title={currency.currencyTypeName} />}
-                            </div>
-                            <div className="arrow">→</div>
-                            <div className="grp chaos-group" title="Chaos equivalent">
-                              <span className="num">{formatShort(currency.chaosEquivalent)}</span>
-                              {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" />}
-                            </div>
-                          </>
-                        )}
+                          style={{ textTransform: 'lowercase', marginLeft:'auto' }}
+                          title="Open PoE Wiki"
+                        >wiki ↗</a>
+                      </div>
+                    </td>
+                    <td className="price-cell">
+                      <div className={`price-grid expanded-chain`}> 
+                        {/* Divine -> Chaos -> Unit chain (hide divine if extremely small) */}
+                        {(() => {
+                          const divEq = currency.divineEquivalent
+                          const showDiv = divEq !== undefined && divEq > 0.005 && divEq < 1000 && currency.detailsId !== 'divine-orb'
+                          const chaosEq = currency.chaosEquivalent
+                          if (mode === 'buy') {
+                            return (
+                              <>
+                                {showDiv && (
+                                  <>
+                                    <div className="grp divine-group" title="Divine equivalent">
+                                      <span className="num">{divEq! < 1 ? divEq!.toFixed(divEq! < 0.1 ? 3 : 2) : formatShort(divEq!)}</span>
+                                      {divineIcon && <img src={divineIcon} alt="Divine Orb" title="Divine Orb" />}
+                                    </div>
+                                    <div className="arrow">→</div>
+                                  </>
+                                )}
+                                <div className="grp chaos-group" title="Chaos equivalent">
+                                  <span className="num">{formatShort(chaosEq)}</span>
+                                  {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" />}
+                                </div>
+                                <div className="arrow">→</div>
+                                <div className="grp target-group" title="Unit price">
+                                  <span className="num">1.0</span>
+                                  {currency.icon && <img src={currency.icon} alt={currency.currencyTypeName} title={currency.currencyTypeName} />}
+                                </div>
+                              </>
+                            )
+                          } else {
+                            return (
+                              <>
+                                <div className="grp target-group" title="Unit price">
+                                  <span className="num">1.0</span>
+                                  {currency.icon && <img src={currency.icon} alt={currency.currencyTypeName} title={currency.currencyTypeName} />}
+                                </div>
+                                <div className="arrow">→</div>
+                                <div className="grp chaos-group" title="Chaos equivalent">
+                                  <span className="num">{formatShort(chaosEq)}</span>
+                                  {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" />}
+                                </div>
+                                {showDiv && (
+                                  <>
+                                    <div className="arrow">→</div>
+                                    <div className="grp divine-group" title="Divine equivalent">
+                                      <span className="num">{divEq! < 1 ? divEq!.toFixed(divEq! < 0.1 ? 3 : 2) : formatShort(divEq!)}</span>
+                                      {divineIcon && <img src={divineIcon} alt="Divine Orb" title="Divine Orb" />}
+                                    </div>
+                                  </>
+                                )}
+                              </>
+                            )
+                          }
+                        })()}
                       </div>
                     </td>
                     <td>
                       <Sparkline data={spark.slice(-24)} />
                     </td>
-                    <td className={getTrendColor(change)}>{formatChange(change)}</td>
-                    <td>~{listed}</td>
+                    <td>
+                      <span style={{
+                        color: change ? (change > 0 ? '#4caf50' : '#f44336') : 'var(--muted,#999)',
+                        fontWeight:600
+                      }}>{formatChange(change)}</span>
+                    </td>
+                    <td title="Approximate listing sample count (pay + receive)">~{(() => {
+                      const listedRaw = (currency.pay?.data_point_count||0) + (currency.receive?.data_point_count||0)
+                      return listedRaw >= 1000 ? `${Math.round(listedRaw/100)/10}k` : `${listedRaw}`
+                    })()}</td>
                     <td>
                       <TradeMenu currency={currency} />
                     </td>
