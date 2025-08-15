@@ -71,15 +71,17 @@ export function ItemPriceChecker() {
     return `${diffDays}d ago`
   }
 
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const toggle = (id: string) => setExpanded(prev=> ({...prev, [id]: !prev[id]}))
+
   return (
     <div>
-      {/* Search Input */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-4 items-center">
         <div className="search-container flex-1">
           <div className="search-icon">🔍</div>
           <input
             type="text"
-            placeholder="Search for items (e.g., 'Tabula Rasa', 'Chaos Orb', 'Belly of the Beast')"
+            placeholder="Search items (e.g. Mageblood, Headhunter)"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyPress={handleKeyPress}
@@ -87,115 +89,100 @@ export function ItemPriceChecker() {
           />
         </div>
         <button onClick={handleSearch} disabled={loading || !searchTerm.trim()} className="btn btn-accent">
-          {loading ? (
-            <>
-              <div className="spinner" style={{ width: "16px", height: "16px", marginRight: "8px" }}></div>
-              Searching...
-            </>
-          ) : (
-            <>🔍 Search</>
-          )}
+          {loading ? 'Searching…' : 'Search'}
         </button>
+        {searchResults.length>0 && <div className="status status-connected">{searchResults.length} items</div>}
       </div>
 
-      {/* Search Results */}
       {loading && (
-        <div className="loading">
-          <div className="spinner"></div>
-          Searching items...
-        </div>
+        <div className="loading"><div className="spinner" /> Searching items...</div>
       )}
 
-      {!loading && searchResults.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="card-title">Search Results</h3>
-            <div className="status status-connected">{searchResults.length} items found</div>
-          </div>
-
-          <div className="grid gap-4">
-            {searchResults.map((item, index) => (
-              <div key={index} className="card">
-                <div className="card-header">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 style={getRarityColor(item.item.rarity)}>{item.item.name || item.item.typeLine}</h4>
-                      {item.item.name && item.item.typeLine && (
-                        <p className="text-muted text-sm">{item.item.typeLine}</p>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <span className="status status-connected">{item.item.rarity}</span>
-                      {item.item.corrupted && <span className="status status-disconnected">Corrupted</span>}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Item Properties */}
-                {item.item.properties && item.item.properties.length > 0 && (
-                  <div className="mb-4">
-                    {item.item.properties.map((prop, propIndex) => (
-                      <div key={propIndex} className="text-sm">
-                        <span className="font-medium">{prop.name}:</span>{" "}
-                        <span className="text-muted">{prop.values.map(([value]) => value).join(", ")}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Mods */}
-                {(item.item.implicitMods || item.item.explicitMods) && (
-                  <div className="mb-4">
-                    {item.item.implicitMods && (
-                      <div className="mb-2">
-                        <p className="text-sm font-medium text-muted mb-1">Implicit:</p>
-                        {item.item.implicitMods.map((mod, modIndex) => (
-                          <p key={modIndex} className="text-sm" style={{ color: "#8888ff" }}>
-                            {mod}
-                          </p>
-                        ))}
-                      </div>
+      {!loading && searchResults.length>0 && (
+        <div className="table-container">
+          <table className="table">
+            <thead>
+              <tr>
+                <th style={{minWidth:260}}>Item</th>
+                <th style={{width:120}}>Price</th>
+                <th style={{width:140}}>Seller</th>
+                <th style={{width:90}}>Indexed</th>
+                <th style={{width:110}}>Copy Whisper</th>
+              </tr>
+            </thead>
+            <tbody>
+              {searchResults.map(item => {
+                const id = item.id
+                const isOpen = !!expanded[id]
+                const rarityStyle = getRarityColor(item.item.rarity)
+                return (
+                  <>
+                    <tr key={id} className={isOpen? 'row-open': ''}>
+                      <td>
+                        <div style={{display:'flex',alignItems:'center',gap:10}}>
+                          <img src={item.item.icon} alt="" style={{width:40,height:40,objectFit:'contain'}} />
+                          <div style={{display:'flex',flexDirection:'column'}}>
+                            <span style={rarityStyle as any}>{item.item.name || item.item.typeLine}</span>
+                            {item.item.name && item.item.typeLine && <span style={{fontSize:11,opacity:.6}}>{item.item.typeLine}</span>}
+                          </div>
+                          <button onClick={()=>toggle(id)} style={{marginLeft:'auto',background:'none',border:'1px solid #333',color:'#bbb',fontSize:11,padding:'2px 6px',borderRadius:4,cursor:'pointer'}}>{isOpen? 'Hide' : 'Details'}</button>
+                        </div>
+                      </td>
+                      <td style={{fontWeight:600}}>{formatPrice(item.listing.price)}</td>
+                      <td style={{fontSize:12}}>
+                        <div style={{display:'flex',flexDirection:'column',gap:2}}>
+                          <span>{item.listing.account.name}</span>
+                          {item.listing.account.online && <span style={{color:'#4ade80',fontSize:11}}>Online</span>}
+                        </div>
+                      </td>
+                      <td style={{fontSize:12}}>{formatTimeAgo(item.listing.indexed)}</td>
+                      <td>
+                        <button
+                          className="btn btn-sm"
+                          onClick={()=>navigator.clipboard.writeText(item.listing.whisper)}
+                          title="Copy whisper to clipboard"
+                        >Copy</button>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr key={id+':details'} style={{background:'#1b1b1b'}}>
+                        <td colSpan={5} style={{padding:'12px 18px'}}>
+                          <div style={{display:'flex',flexWrap:'wrap',gap:32}}>
+                            {item.item.properties && item.item.properties.length>0 && (
+                              <div style={{minWidth:200}}>
+                                <div style={{fontSize:12,letterSpacing:.5,opacity:.7,marginBottom:4}}>Properties</div>
+                                {item.item.properties.map((p,i)=>(
+                                  <div key={i} style={{fontSize:12}}>
+                                    <span style={{opacity:.8}}>{p.name}:</span> {p.values.map(([v])=>v).join(', ')}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {(item.item.implicitMods || item.item.explicitMods) && (
+                              <div style={{minWidth:260}}>
+                                {item.item.implicitMods && (
+                                  <div style={{marginBottom:8}}>
+                                    <div style={{fontSize:12,letterSpacing:.5,opacity:.7,marginBottom:4}}>Implicit Mods</div>
+                                    {item.item.implicitMods.map((m,i)=>(<div key={i} style={{fontSize:12,color:'#8888ff'}}>{m}</div>))}
+                                  </div>
+                                )}
+                                {item.item.explicitMods && (
+                                  <div>
+                                    <div style={{fontSize:12,letterSpacing:.5,opacity:.7,marginBottom:4}}>Explicit Mods</div>
+                                    {item.item.explicitMods.map((m,i)=>(<div key={i} style={{fontSize:12,color:'#ffff77'}}>{m}</div>))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                    {item.item.explicitMods && (
-                      <div>
-                        <p className="text-sm font-medium text-muted mb-1">Explicit:</p>
-                        {item.item.explicitMods.map((mod, modIndex) => (
-                          <p key={modIndex} className="text-sm" style={{ color: "#ffff77" }}>
-                            {mod}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <hr style={{ border: "1px solid var(--poe-border)", margin: "16px 0" }} />
-
-                {/* Listing Info */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 text-sm mb-1">
-                      <span>👤 {item.listing.account.name}</span>
-                      {item.listing.account.online && <span className="status status-connected">Online</span>}
-                    </div>
-                    <div className="text-sm text-muted">🕒 Listed {formatTimeAgo(item.listing.indexed)}</div>
-                  </div>
-
-                  <div className="text-right">
-                    <div className="text-lg font-bold mb-2">{formatPrice(item.listing.price)}</div>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => {
-                        navigator.clipboard.writeText(item.listing.whisper)
-                      }}
-                    >
-                      📋 Copy Whisper
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                  </>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -204,7 +191,7 @@ export function ItemPriceChecker() {
           <div style={{ padding: "48px 24px" }}>
             <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔍</div>
             <h3 className="card-title mb-2">No items found</h3>
-            <p className="text-muted">Try searching for a different item name or check your spelling.</p>
+            <p className="text-muted">Try a different item name or check spelling.</p>
           </div>
         </div>
       )}
