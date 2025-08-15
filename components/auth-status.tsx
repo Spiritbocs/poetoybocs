@@ -7,6 +7,7 @@ export function AuthStatus() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [accountName, setAccountName] = useState<string | null>(null)
+  const envReady = (process.env.NEXT_PUBLIC_POE_CLIENT_ID?.length || 0) > 0 && (process.env.NEXT_PUBLIC_POE_REDIRECT_URI?.length || 0) > 0
 
   useEffect(() => {
     // Check for stored token on component mount
@@ -78,11 +79,8 @@ export function AuthStatus() {
           <button
             onClick={handleLogout}
             className="btn btn-primary"
-            disabled
-            aria-disabled="true"
-            title="Temporarily disabled"
           >
-            🚪 Disconnect (disabled)
+            🚪 Disconnect
           </button>
         </div>
       ) : (
@@ -95,12 +93,14 @@ export function AuthStatus() {
           <button
             onClick={handleLogin}
             className="btn btn-accent"
-            disabled
-            aria-disabled="true"
-            title="Temporarily disabled"
+            disabled={!envReady}
+            title={envReady ? "Authenticate with Path of Exile" : "Missing env vars: set NEXT_PUBLIC_POE_CLIENT_ID & NEXT_PUBLIC_POE_REDIRECT_URI"}
           >
-            🔗 Connect to Path of Exile (disabled)
+            🔗 {envReady ? 'Connect to Path of Exile' : 'Env not configured'}
           </button>
+          {!envReady && (
+            <p className="mt-2 text-xs text-muted">Add NEXT_PUBLIC_POE_CLIENT_ID and NEXT_PUBLIC_POE_REDIRECT_URI to .env.local then restart.</p>
+          )}
         </div>
       )}
     </div>
