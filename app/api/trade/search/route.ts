@@ -40,7 +40,7 @@ async function ensureCookies(league: string) {
     try {
       // Hitting a real trade search page to obtain Cloudflare / site cookies.
       const url = `https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}`
-      const res = await fetch(url, { method: 'GET', redirect: 'manual', headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml' }, cache: 'no-store' })
+  const res = await fetch(url, { method: 'GET', redirect: 'manual', headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml', ...(sessionCookieEnabled && sessionId ? { 'Cookie': `POESESSID=${sessionId}` } : {}) }, cache: 'no-store' })
       // Attempt to extract all set-cookie headers
       let cookies: string[] = []
       const single = res.headers.get('set-cookie')
@@ -128,6 +128,10 @@ export async function POST(req: Request) {
       if (since < backoff) {
         await new Promise(r=> setTimeout(r, backoff - since))
       }
+    }
+    // Pre-warm cookies early if we have a session cookie but haven't acquired Cloudflare cookies yet
+    if (sessionCookieEnabled && !cookieHeader) {
+      try { await ensureCookies(league) } catch {/* ignore */}
     }
     let attempt = await doSearch()
     // If forbidden (Cloudflare / upstream) try a lightweight warm-up fetch then retry once.
