@@ -66,6 +66,8 @@ export function ItemPriceChecker() {
   const [poePriceNote, setPoePriceNote] = useState<string | null>(null)
   // Fallback poe.ninja baseline when trade API blocked
   const [fallbackPrice, setFallbackPrice] = useState<{ chaos:number; source:string; matched:string }|null>(null)
+  // User preference to hide trade 403 banner after acknowledging fallback-only mode
+  const [hideForbiddenBanner, setHideForbiddenBanner] = useState(false)
   const [lastQuery, setLastQuery] = useState<any | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [hideCrafted, setHideCrafted] = useState(true)
@@ -88,6 +90,8 @@ export function ItemPriceChecker() {
   const ICON_SIZE = 18
   const iconStyle: React.CSSProperties = { width: ICON_SIZE, height: ICON_SIZE, objectFit:'contain', verticalAlign:'text-bottom' }
   useEffect(()=>{ if(!selectedLeague) return; let cancelled=false; (async()=>{ try { const cur= await poeApi.getCurrencyData(selectedLeague,'Currency'); if(cancelled) return; const chaos=cur.find(c=>c.detailsId==='chaos-orb'); const div=cur.find(c=>c.detailsId==='divine-orb'); setChaosIcon(chaos?.icon || CHAOS_ICON_FALLBACK); if(div?.icon) setDivineIcon(div.icon) } catch { setChaosIcon(c=> c||CHAOS_ICON_FALLBACK) } })(); return ()=>{ cancelled=true } },[selectedLeague])
+  // Load banner suppression preference
+  useEffect(()=>{ try { if (localStorage.getItem('price_check_hide_forbidden')==='1') setHideForbiddenBanner(true) } catch {/* ignore */} },[])
 
   // Per-stat quick filter state (initialized from parsed item lines)
   const [statFilters, setStatFilters] = useState<Record<string,{ enabled: boolean; min: string; max: string; quality: string; text?: string; source?: string }>>({})
@@ -1210,7 +1214,7 @@ export function ItemPriceChecker() {
   return (
     <div>
       {/* Upstream 403 guidance banner */}
-      {forbiddenMeta && (
+  {forbiddenMeta && !hideForbiddenBanner && (
         <div style={{
           background:'linear-gradient(145deg,#3b1e1e,#2a1212)',
           border:'1px solid #6a2c2c',
@@ -1238,7 +1242,10 @@ export function ItemPriceChecker() {
               </div>
             )}
           </div>
-          <button onClick={()=> setForbiddenMeta(null)} style={{marginTop:8,fontSize:11,background:'#532',color:'#ffd7d7',border:'1px solid #7a4636',padding:'4px 10px',borderRadius:6,cursor:'pointer'}}>Dismiss</button>
+          <div style={{display:'flex',gap:8,marginTop:8}}>
+            <button onClick={()=> setForbiddenMeta(null)} style={{fontSize:11,background:'#532',color:'#ffd7d7',border:'1px solid #7a4636',padding:'4px 10px',borderRadius:6,cursor:'pointer'}}>Dismiss</button>
+            <button onClick={()=> { setHideForbiddenBanner(true); try{ localStorage.setItem('price_check_hide_forbidden','1') }catch{} }} style={{fontSize:11,background:'#352',color:'#d7ffcf',border:'1px solid #4b6a38',padding:'4px 10px',borderRadius:6,cursor:'pointer'}}>Hide & use fallback only</button>
+          </div>
         </div>
       )}
       <div style={{display:'flex',gap:12,marginBottom:16}}>
