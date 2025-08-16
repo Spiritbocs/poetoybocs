@@ -1,4 +1,6 @@
 export const dynamic = 'force-dynamic'
+// Force Node.js runtime (Edge sometimes yields different headers / fetch behavior leading to upstream 403 or pricing mismatch)
+export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 
 // POST body: { ids: string[], query: string }

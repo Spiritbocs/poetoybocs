@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 
 // Proxy to poeprices.info ML-based pricing service
@@ -29,16 +30,21 @@ export async function POST(request: Request) {
       })
     }
     let response = await call()
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[poeprices] initial status', response.status)
+    }
     if (!response.ok && response.status >= 500) {
       // brief retry once on 5xx
-      await new Promise(r=> setTimeout(r, 500))
-      response = await call()
+  await new Promise(r=> setTimeout(r, 500))
+  response = await call()
+  if (process.env.NODE_ENV !== 'production') console.log('[poeprices] retry status', response.status)
     }
     if (!response.ok) {
-      return NextResponse.json({ error: 'upstream_error', status: response.status }, { status: 502 })
+  console.warn('[poeprices] upstream non-ok', response.status)
+  return NextResponse.json({ error: 'upstream_error', status: response.status }, { status: 502 })
     }
     let result: any = null
-    try { result = await response.json() } catch (e) { return NextResponse.json({ error:'invalid_upstream_json' }, { status:502 }) }
+  try { result = await response.json() } catch (e) { console.error('[poeprices] invalid json'); return NextResponse.json({ error:'invalid_upstream_json' }, { status:502 }) }
     // Map known poeprices error codes to descriptive messages
     if (result && typeof result.error === 'number' && result.error !== 0) {
       const code = result.error
