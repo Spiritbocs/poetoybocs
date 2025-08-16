@@ -300,11 +300,20 @@ private oauthConfig: OAuthConfig = {
   // Determine redirect URI (env or current origin fallback for local dev)
   const redirectUri = this.oauthConfig.redirectUri || (typeof window !== 'undefined' ? `${window.location.origin}/oauth/callback` : '')
 
+    console.log("[getAuthUrl] OAuth config:", {
+      clientId: this.oauthConfig.clientId?.substring(0, 5) + "...",
+      redirectUri,
+      state,
+      origin: typeof window !== 'undefined' ? window.location.origin : 'server'
+    })
+
     // Store PKCE data keyed by state to avoid race if multiple auth attempts start
     if (typeof window !== "undefined") {
       try {
         const key = `poe_pkce_data_${state}`
-        localStorage.setItem(key, JSON.stringify({ codeVerifier, codeChallenge, state, ts: Date.now() }))
+        const pkceData = { codeVerifier, codeChallenge, state, ts: Date.now() }
+        localStorage.setItem(key, JSON.stringify(pkceData))
+        console.log("[getAuthUrl] PKCE data stored:", { key, verifierLength: codeVerifier.length })
         // Maintain an index for cleanup
         const idxRaw = localStorage.getItem('poe_pkce_index')
         const idx: string[] = idxRaw ? JSON.parse(idxRaw) : []
@@ -312,7 +321,10 @@ private oauthConfig: OAuthConfig = {
         // Prune old (older than 10 minutes or keep last 5)
         while (idx.length > 8) idx.shift()
         localStorage.setItem('poe_pkce_index', JSON.stringify(idx))
-      } catch {/* ignore storage errors */}
+      } catch (e) {
+        console.error("[getAuthUrl] Failed to store PKCE data:", e)
+        /* ignore storage errors */
+      }
     }
 
     const params = new URLSearchParams({
@@ -345,27 +357,35 @@ private oauthConfig: OAuthConfig = {
 
   async exchangeCodeForToken(code: string, state: string): Promise<AuthToken> {
     try {
+      console.log("[exchangeCodeForToken] Starting token exchange:", { codePrefix: code.substring(0, 8), state })
       // Retrieve PKCE data
       let pkceData: PKCEData | null = null
       if (typeof window !== "undefined") {
         try {
           const key = `poe_pkce_data_${state}`
           const stored = localStorage.getItem(key)
+          console.log("[exchangeCodeForToken] Looking for PKCE data:", { key, found: !!stored })
           if (stored) {
             pkceData = JSON.parse(stored)
             localStorage.removeItem(key)
+            console.log("[exchangeCodeForToken] PKCE data retrieved and removed")
           } else {
             // Try fallback legacy key (pre multi-state implementation)
             const legacy = localStorage.getItem('poe_pkce_data')
+            console.log("[exchangeCodeForToken] Checking legacy PKCE data:", { found: !!legacy })
             if (legacy) {
               const parsed = JSON.parse(legacy)
               if (parsed.state === state) {
                 pkceData = parsed
+                console.log("[exchangeCodeForToken] Legacy PKCE data matched")
               }
               localStorage.removeItem('poe_pkce_data')
             }
           }
-        } catch {/* ignore */}
+        } catch (e) {
+          console.error("[exchangeCodeForToken] Error retrieving PKCE data:", e)
+          /* ignore */
+        }
       }
 
       if (!pkceData || pkceData.state !== state || !pkceData.codeVerifier) {
@@ -394,10 +414,12 @@ private oauthConfig: OAuthConfig = {
 
       const token = await response.json()
       this.authToken = token
+      console.log("[exchangeCodeForToken] Token received and set:", { hasToken: !!token, tokenType: token?.token_type })
 
       // Store in localStorage for persistence
       if (typeof window !== "undefined") {
         localStorage.setItem("poe_auth_token", JSON.stringify(token))
+        console.log("[exchangeCodeForToken] Token stored in localStorage")
       }
 
       return token

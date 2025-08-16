@@ -15,6 +15,7 @@ export function AuthStatus() {
   useEffect(() => {
     // Check for stored token on component mount
     const hasToken = poeApi.loadStoredToken()
+    console.log("[AuthStatus] Token check:", { hasToken, localStorage: typeof window !== 'undefined' ? Object.keys(localStorage).filter(k => k.startsWith('poe_')) : 'server' })
     setIsAuthenticated(hasToken)
     const loadProfile = async () => {
       if (hasToken) {
@@ -43,17 +44,21 @@ export function AuthStatus() {
 
   const handleLogin = async () => {
     try {
+      console.log("[AuthStatus] Starting login process...")
       const authUrl = await poeApi.getAuthUrl()
+      console.log("[AuthStatus] Auth URL generated:", authUrl?.substring(0, 100) + "...")
       if (authUrl) {
+        console.log("[AuthStatus] Redirecting to PoE...")
         window.location.href = authUrl
       } else {
+        console.log("[AuthStatus] No auth URL - using popup flow")
         // Popup handled authentication; refresh local state
         const prof = await poeApi.getProfile(true)
         if (prof?.name) setAccountName(prof.name)
         setIsAuthenticated(poeApi.isAuthenticated())
       }
     } catch (error) {
-      console.error("Error generating auth URL:", error)
+      console.error("[AuthStatus] Error generating auth URL:", error)
     }
   }
 
