@@ -74,6 +74,8 @@ class ElectronTradeAPI implements DesktopTradeAPI {
   }
 
   async testConnection(league: string = 'Mercenaries', sessionId?: string) {
+    console.log('[ElectronTradeAPI] Testing connection:', { league, sessionId: sessionId ? 'provided' : 'none' })
+    
     const testQuery = {
       query: {
         status: { option: "online" },
@@ -88,6 +90,7 @@ class ElectronTradeAPI implements DesktopTradeAPI {
         method: 'electron-direct'
       }
     } catch (error) {
+      console.error('[ElectronTradeAPI] Test connection failed:', error)
       return {
         success: false,
         method: 'none',

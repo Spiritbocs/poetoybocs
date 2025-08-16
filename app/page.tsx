@@ -1,22 +1,36 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { TopNav } from "@/components/top-nav"
+import { AuthStatus } from "@/components/auth-status"
 import { CurrencyTracker } from "@/components/currency-tracker"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { ItemOverviewTable } from "@/components/item-overview-table"
 import { ItemPriceChecker } from "@/components/item-price-checker"
 import { SessionManager } from "@/components/session-manager"
+import { DesktopSessionManager } from "@/components/desktop-session-manager"
+import { CharacterViewer } from "@/components/character-viewer"
+import { AtlasViewer } from "@/components/atlas-viewer"
+import { PassiveTreeViewer } from "@/components/passive-tree-viewer"
 import { useLeague } from "@/components/league-context"
 
+type AppSection = "market" | "characters" | "atlas" | "passive-tree" | "settings"
+
 export default function HomePage() {
+  const [activeSection, setActiveSection] = useState<AppSection>("market")
   const [activeTab, setActiveTab] = useState<"currency" | "items">("currency")
   const [sessionReady, setSessionReady] = useState(false)
   const [userSessionId, setUserSessionId] = useState<string>('')
+  const [isDesktopMode, setIsDesktopMode] = useState(false)
+  const [oauthReady, setOauthReady] = useState(false)
   
   // Consume shared league/realm from context (TopNav now manages selection)
   const { league, realm } = useLeague()
-  const [activeSection, setActiveSection] = useState<{ key: string; label: string; type?: "Currency" | "Fragment" }>({ key: 'currency', label: 'Currency', type: 'Currency' })
+
+  // Detect if running in desktop mode
+  useEffect(() => {
+    setIsDesktopMode(typeof window !== 'undefined' && !!(window as any).electronAPI)
+  }, [])
 
   const handleSessionReady = (sessionId: string) => {
     setUserSessionId(sessionId)
@@ -29,10 +43,14 @@ export default function HomePage() {
     <div className="container" style={{paddingTop:'16px'}}>
   {/* Header removed per request; content condenses upward */}
 
-      {/* Session Manager - shows when trade features are not ready */}
+      {/* Session Manager - desktop vs web mode */}
       {!sessionReady && (
         <div style={{ marginBottom: '2rem' }}>
-          <SessionManager onSessionReady={handleSessionReady} isTradeEnabled={sessionReady} league={league} />
+          {isDesktopMode ? (
+            <DesktopSessionManager onSessionReady={handleSessionReady} isTradeEnabled={sessionReady} league={league} />
+          ) : (
+            <SessionManager onSessionReady={handleSessionReady} isTradeEnabled={sessionReady} league={league} />
+          )}
         </div>
       )}
 

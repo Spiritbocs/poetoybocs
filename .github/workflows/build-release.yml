@@ -1,0 +1,78 @@
+name: Build and Release Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          NEXT_PUBLIC_POE_CLIENT_ID: ${{ secrets.POE_CLIENT_ID }}
+          NEXT_PUBLIC_POE_REDIRECT_URI: ${{ secrets.POE_REDIRECT_URI }}
+      
+      - name: Build Electron app
+        run: npm run electron:build
+        env:
+          # Code signing certificates for production
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # macOS notarization
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASS: ${{ secrets.APPLE_ID_PASS }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.os }}
+          path: dist/
+          retention-days: 30
+  
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release-windows-latest/**/*.exe
+            release-windows-latest/**/*.zip
+            release-macos-latest/**/*.dmg
+            release-macos-latest/**/*.zip
+            release-ubuntu-latest/**/*.AppImage
+            release-ubuntu-latest/**/*.deb
+            release-ubuntu-latest/**/*.rpm
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

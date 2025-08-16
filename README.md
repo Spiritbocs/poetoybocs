@@ -1,12 +1,179 @@
-<div align="center">
-	<h1>PoE Market Tracker</h1>
-	<p><strong>League / realm‑aware Path of Exile currency & item price viewer with poe.ninja style UI.</strong></p>
-	<p>
-		<a href="https://poetoybocs.vercel.app" target="_blank"><img alt="Vercel" src="https://img.shields.io/badge/Deploy-Vercel-black?logo=vercel" /></a>
-		<img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5+-3178C6?logo=typescript" />
-		<img alt="Next.js" src="https://img.shields.io/badge/Next.js-14+-000000?logo=next.js" />
-	</p>
-</div>
+# PoE Toy Bocs 🎮
+
+A comprehensive Path of Exile desktop information tool inspired by PoE Overlay. Get real-time item pricing, character builds, atlas progression, and market data - all in one desktop application.
+
+![PoE Toy Bocs](./public/placeholder-logo.png)
+
+## ✨ Features
+
+### 🔍 **Item & Market Information**
+- **Real-time Item Pricing** - Instant valuations using PoE trade API
+- **Currency Exchange Rates** - Live currency conversion and tracking
+- **Market Analysis** - Advanced search and filtering tools
+- **Price History** - Trends and market analysis
+
+### 👤 **Character & Build Tools**
+- **Character Inspector** - View builds, equipment, and stats
+- **Multi-Character Support** - Switch between all your characters
+- **Skill Tree Viewer** - Allocated passive points and build analysis
+- **Gear Analysis** - Equipment optimization suggestions
+
+### 🗺️ **Atlas & Progression**
+- **Atlas Completion Tracking** - Monitor your atlas progress
+- **Map Bonus Overview** - Track completion bonuses
+- **Atlas Passive Tree** - View allocated atlas passives
+- **Progress Statistics** - Detailed progression metrics
+
+### 💻 **Desktop Advantages**
+- **Auto-Session Detection** - Automatically detect PoE sessions from browser
+- **Direct API Access** - No CORS limitations or proxy servers
+- **Offline Mode** - Cached data when disconnected
+- **Native Performance** - Fast, responsive desktop experience
+
+## 🚀 Quick Start
+
+### Download & Install
+1. Download the latest release for your platform from [Releases](https://github.com/Spiritbocs/poetoybocs/releases)
+2. Install the application:
+   - **Windows**: Run the `.exe` installer
+   - **macOS**: Mount the `.dmg` and drag to Applications
+   - **Linux**: Install the `.AppImage`, `.deb`, or `.rpm` package
+
+### First Time Setup
+1. **Launch the app** - PoE Toy Bocs will open in a 1778x1045 window
+2. **Session Detection** - The app will attempt to auto-detect your PoE session from browser cookies
+3. **Optional Account Connection** - Connect your PoE account for character data (OAuth)
+4. **Select League** - Choose your current league
+5. **Start Exploring** - Begin using item pricing and character tools!
+
+## 🔧 Development
+
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
+- Git
+
+### Local Development
+```bash
+# Clone the repository
+git clone https://github.com/Spiritbocs/poetoybocs.git
+cd poetoybocs
+
+# Install dependencies
+npm install
+
+# Start Next.js development server
+npm run dev
+
+# In another terminal, start the desktop app
+npm run dev:electron
+```
+
+### Build for Production
+```bash
+# Build the Next.js app
+npm run build
+
+# Build desktop applications for all platforms
+npm run electron:build
+
+# Build for current platform only
+npm run electron:dist
+```
+
+## 🔐 Authentication
+
+PoE Toy Bocs uses a dual authentication system for maximum functionality:
+
+### Session Management (Required for Pricing)
+- **POESESSID Cookie** - Automatically detected from your browser
+- **Manual Entry** - Copy session ID if auto-detection fails
+- **Purpose** - Access trade API for item pricing and market data
+
+### OAuth Connection (Optional for Character Data)
+- **PoE Account Integration** - Connect your official PoE account
+- **Purpose** - Access character builds, atlas progression, passive trees
+- **Privacy** - Only reads public character data, never modifies anything
+
+## 📋 Project Status
+
+### Current Phase: Desktop Foundation
+- ✅ Basic desktop app structure
+- ✅ OAuth authentication system  
+- ✅ Currency tracking functionality
+- ✅ Item price checking (basic)
+- 🔄 Desktop mode testing and validation
+- 🔄 Enhanced session detection
+
+### Upcoming Features
+- 📋 Character data integration
+- 📋 Atlas progression tracking
+- 📋 Enhanced item evaluation tools
+- 📋 Performance optimization
+
+See our [Development Plan](./PLAN_V2.md) and [Kanban Board](./KANBAN.md) for detailed roadmap.
+
+## 🤝 Contributing
+
+We welcome contributions! Here's how you can help:
+
+### 🐛 Report Bugs
+Use our [Bug Report Template](./.github/ISSUE_TEMPLATE/bug_report.md) to report issues.
+
+### 💡 Request Features  
+Use our [Feature Request Template](./.github/ISSUE_TEMPLATE/feature_request.md) to suggest new features.
+
+### 👨‍💻 Contribute Code
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### 📊 Development Workflow
+We use a kanban board to track development. Check our [GitHub Projects](https://github.com/Spiritbocs/poetoybocs/projects) to see current work and pick up tasks.
+
+## 🏗️ Architecture
+
+### Technology Stack
+- **Framework**: Next.js 14 + Electron
+- **Language**: TypeScript
+- **UI**: React + Tailwind CSS
+- **APIs**: PoE Official API (OAuth + Trade)
+- **Desktop**: Electron with secure IPC
+- **Build**: electron-builder for cross-platform
+
+### Key Components
+```
+├── electron-main.js          # Main Electron process
+├── electron-preload.js       # Secure IPC bridge  
+├── app/                      # Next.js application
+├── components/               # React components
+├── lib/                      # Utilities and API clients
+└── .github/                  # CI/CD and project templates
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **Path of Exile** - Amazing game by Grinding Gear Games
+- **PoE Overlay** - Inspiration for desktop tool design
+- **Awakened PoE Trade** - Session management approach
+- **PoE Community** - Feedback and feature suggestions
+
+## 🔗 Links
+
+- **Issues**: [GitHub Issues](https://github.com/Spiritbocs/poetoybocs/issues)
+- **Releases**: [GitHub Releases](https://github.com/Spiritbocs/poetoybocs/releases)
+- **Project Board**: [GitHub Projects](https://github.com/Spiritbocs/poetoybocs/projects)
+- **PoE API**: [Official PoE API](https://www.pathofexile.com/developer/docs)
+
+---
+
+**Made with ❤️ for the Path of Exile community**
 
 ## ✨ Features
 

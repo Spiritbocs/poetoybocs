@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Direct PoE API access (bypasses CORS and IP blocking)
   poeApiRequest: (url, options) => ipcRenderer.invoke('poe-api-request', { url, options }),
   
+  // Desktop-specific PoE session management
+  detectPoeSession: () => ipcRenderer.invoke('detect-poe-session'),
+  openPoeTradeInBrowser: (league) => ipcRenderer.invoke('open-poe-trade', league),
+  
   // Local data storage (better than localStorage)
   saveUserData: (key, data) => ipcRenderer.invoke('save-user-data', { key, data }),
   loadUserData: (key) => ipcRenderer.invoke('load-user-data', { key }),

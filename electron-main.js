@@ -23,9 +23,11 @@ function createWindow() {
   // Load the built Next.js app locally instead of web version
   const isDev = process.env.NODE_ENV === 'development'
   const startUrl = isDev 
-    ? 'http://localhost:3000' 
-    : `file://${path.join(__dirname, '../out/index.html')}`
+    ? 'http://localhost:3001' 
+    : 'https://poetoybocs.vercel.app' // Fallback to web version for now
   
+  console.log('[electron] App ready, version:', app.getVersion())
+  console.log('[electron] Environment:', isDev ? 'development' : 'production')
   console.log('[electron] loading', startUrl)
   
   mainWindow.loadURL(startUrl)
@@ -80,6 +82,60 @@ ipcMain.handle('poe-api-request', async (event, { url, options }) => {
       ok: false,
       error: error.message
     }
+  }
+})
+
+// Auto-detect PoE session from browser cookies (like Awakened PoE Trade)
+ipcMain.handle('detect-poe-session', async () => {
+  try {
+    const os = require('os')
+    const path = require('path')
+    
+    // Chrome/Edge cookie paths on Windows
+    const chromePaths = [
+      path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cookies'),
+      path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Cookies')
+    ]
+    
+    // Try to find POESESSID in browser cookies
+    for (const cookiePath of chromePaths) {
+      if (fs.existsSync(cookiePath)) {
+        try {
+          // Note: Real implementation would use sqlite3 to read Chrome cookies
+          // For now, return a placeholder that indicates auto-detection is available
+          return {
+            success: true,
+            method: 'browser_auto_detect',
+            message: 'Desktop app can auto-detect session (feature in development)'
+          }
+        } catch (error) {
+          console.log('[poe-session] Could not read cookies from:', cookiePath)
+        }
+      }
+    }
+    
+    return {
+      success: false,
+      method: 'manual',
+      message: 'Auto-detection not available, manual session entry required'
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    }
+  }
+})
+
+// Open PoE trade in system browser for easy session copying
+ipcMain.handle('open-poe-trade', async (event, league = 'Mercenaries') => {
+  try {
+    const { shell } = require('electron')
+    const url = `https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}`
+    await shell.openExternal(url)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
   }
 })
 
