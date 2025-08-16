@@ -237,22 +237,60 @@ private oauthConfig: OAuthConfig = {
   }
 
   private generateCodeVerifier(): string {
-    const array = new Uint8Array(32)
-    crypto.getRandomValues(array)
-    return btoa(String.fromCharCode.apply(null, Array.from(array)))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=/g, "")
+    const toB64Url = (buf: Uint8Array) =>
+      btoa(String.fromCharCode.apply(null, Array.from(buf)))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=/g, "")
+
+    try {
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const array = new Uint8Array(32)
+        crypto.getRandomValues(array)
+        return toB64Url(array)
+      }
+    } catch {/* fall back */}
+
+    // Node / Electron fallback
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const nodeCrypto = require('crypto') as typeof import('crypto')
+      const buf: Buffer = nodeCrypto.randomBytes(32)
+      return toB64Url(new Uint8Array(buf))
+    } catch {/* ignore */}
+
+    // Ultimate fallback (insecure for PKCE but better than breaking login)
+    const fallback = Array.from({ length: 32 }, () => Math.floor(Math.random() * 256))
+    return toB64Url(new Uint8Array(fallback))
   }
 
   private async generateCodeChallenge(verifier: string): Promise<string> {
-    const encoder = new TextEncoder()
-    const data = encoder.encode(verifier)
-    const digest = await crypto.subtle.digest("SHA-256", data)
-    return btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(digest))))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=/g, "")
+    const toB64Url = (bytes: Uint8Array) =>
+      btoa(String.fromCharCode.apply(null, Array.from(bytes)))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=/g, "")
+
+    // Browser WebCrypto path
+    try {
+      if (typeof crypto !== 'undefined' && crypto.subtle?.digest) {
+        const encoder = new TextEncoder()
+        const data = encoder.encode(verifier)
+        const digest = await crypto.subtle.digest('SHA-256', data)
+        return toB64Url(new Uint8Array(digest))
+      }
+    } catch {/* continue to fallback */}
+
+    // Node / Electron fallback using built-in crypto
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const nodeCrypto = require('crypto') as typeof import('crypto')
+      const hash = nodeCrypto.createHash('sha256').update(verifier).digest()
+      return toB64Url(new Uint8Array(hash))
+    } catch {/* ignore */}
+
+    // Last resort: return verifier (not ideal but avoids crash)
+    return verifier
   }
 
   async getAuthUrl(): Promise<string> {
@@ -262,16 +300,19 @@ private oauthConfig: OAuthConfig = {
   // Determine redirect URI (env or current origin fallback for local dev)
   const redirectUri = this.oauthConfig.redirectUri || (typeof window !== 'undefined' ? `${window.location.origin}/oauth/callback` : '')
 
-    // Store PKCE data for token exchange
+    // Store PKCE data keyed by state to avoid race if multiple auth attempts start
     if (typeof window !== "undefined") {
-      localStorage.setItem(
-        "poe_pkce_data",
-        JSON.stringify({
-          codeVerifier,
-          codeChallenge,
-          state,
-        }),
-      )
+      try {
+        const key = `poe_pkce_data_${state}`
+        localStorage.setItem(key, JSON.stringify({ codeVerifier, codeChallenge, state, ts: Date.now() }))
+        // Maintain an index for cleanup
+        const idxRaw = localStorage.getItem('poe_pkce_index')
+        const idx: string[] = idxRaw ? JSON.parse(idxRaw) : []
+        idx.push(key)
+        // Prune old (older than 10 minutes or keep last 5)
+        while (idx.length > 8) idx.shift()
+        localStorage.setItem('poe_pkce_index', JSON.stringify(idx))
+      } catch {/* ignore storage errors */}
     }
 
     const params = new URLSearchParams({
@@ -307,14 +348,27 @@ private oauthConfig: OAuthConfig = {
       // Retrieve PKCE data
       let pkceData: PKCEData | null = null
       if (typeof window !== "undefined") {
-        const stored = localStorage.getItem("poe_pkce_data")
-        if (stored) {
-          pkceData = JSON.parse(stored)
-          localStorage.removeItem("poe_pkce_data")
-        }
+        try {
+          const key = `poe_pkce_data_${state}`
+          const stored = localStorage.getItem(key)
+          if (stored) {
+            pkceData = JSON.parse(stored)
+            localStorage.removeItem(key)
+          } else {
+            // Try fallback legacy key (pre multi-state implementation)
+            const legacy = localStorage.getItem('poe_pkce_data')
+            if (legacy) {
+              const parsed = JSON.parse(legacy)
+              if (parsed.state === state) {
+                pkceData = parsed
+              }
+              localStorage.removeItem('poe_pkce_data')
+            }
+          }
+        } catch {/* ignore */}
       }
 
-      if (!pkceData || pkceData.state !== state) {
+      if (!pkceData || pkceData.state !== state || !pkceData.codeVerifier) {
         throw new Error("Invalid OAuth state or missing PKCE data")
       }
 

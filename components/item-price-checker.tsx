@@ -32,6 +32,21 @@ export function ItemPriceChecker() {
   const [cooldownRemaining, setCooldownRemaining] = useState<number>(0)
   const [cooldownActiveKey, setCooldownActiveKey] = useState<string | null>(null)
   const COOLDOWN_TOOLTIP = "This progress bar shows a 60 second cooldown for this exact item (base + enabled mods) to prevent hitting Path of Exile trade API rate limits (429 Too Many Requests). You can still price different items immediately. When the bar empties or shows 0s, you may re-check this item. This helps keep the tool fast for everyone and avoids forced delays from the API.".replace(/\s+/g,' ').trim()
+  // Manual cooldown reset (user initiated) – clears stored timestamp for active key
+  const resetCooldown = () => {
+    try {
+      const raw = localStorage.getItem('price_check_cooldowns')
+      if (raw) {
+        const map = JSON.parse(raw)
+        if (cooldownActiveKey && map[cooldownActiveKey]) {
+          delete map[cooldownActiveKey]
+          localStorage.setItem('price_check_cooldowns', JSON.stringify(map))
+        }
+      }
+    } catch {/* ignore */}
+    setCooldownRemaining(0)
+    setCooldownActiveKey(null)
+  }
   const [error, setError] = useState<string | null>(null)
   const [tradeSearchId, setTradeSearchId] = useState<string | null>(null)
   // Quick filter state (mirrors the overlay)
@@ -235,6 +250,7 @@ export function ItemPriceChecker() {
   if (currencyFilter) {
     query.query.filters = { ...query.query.filters, trade_filters: { filters: { price: { option: currencyFilter } } } }
   }
+
   if (rarityFilter && rarityFilter !== 'any') {
     query.query.filters = { ...query.query.filters, type_filters: { filters: { rarity: { option: rarityFilter } } } }
   }
@@ -1207,13 +1223,27 @@ export function ItemPriceChecker() {
                   </select>
                   <div style={{marginLeft:'auto',display:'flex',gap:8}}>
                     <button onClick={handleSearch} disabled={loading || !rawClipboard.trim()} style={btnStylePrimary}>Submit</button>
-                    <button onClick={()=>{ setRawClipboard(''); setParsed(null); setStatFilters({}); setSearchResults([]); setPriceSummary(null); setError(null); setSearchPerformed(false); }} style={btnStyle}>Reset</button>
+                    <button
+                      onClick={()=>{
+                        setRawClipboard('');
+                        setParsed(null);
+                        setStatFilters({});
+                        setSearchResults([]);
+                        setPriceSummary(null);
+                        setError(null);
+                        setSearchPerformed(false);
+                        resetCooldown(); // also clear cooldown so a new pasted item can be searched immediately
+                      }}
+                      style={btnStyle}
+                    >Reset</button>
                   </div>
                 </div>
                 <textarea
                   placeholder="Paste item text here (Ctrl+C in game, then Ctrl+V)"
                   value={rawClipboard}
-                  onChange={e=> setRawClipboard(e.target.value)}
+                    onChange={e=> { const v=e.target.value; setRawClipboard(v); if(!v.trim()){ // if user clears box we also clear cooldown to allow immediate fresh search
+                      resetCooldown(); setParsed(null); setSearchResults([]); setPriceSummary(null); setError(null); setSearchPerformed(false); }
+                  }}
                   rows={5}
                   style={{width:'100%',background:'#070707',border:'1px solid #111',color:'#ddd',padding:8,fontFamily:'Consolas, monospace',fontSize:12,borderRadius:6,resize:'vertical'}}
                 />
@@ -1560,7 +1590,7 @@ export function ItemPriceChecker() {
                     type="text"
                     placeholder="Search items (e.g. Mageblood, Headhunter)"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => { const val = e.target.value; setSearchTerm(val); if(!val.trim()){ resetCooldown(); setSearchResults([]); setPriceSummary(null); setExactPrice(null); setError(null); setSearchPerformed(false); } }}
                     onKeyDown={handleKeyPress}
                     className="search-input"
                     style={{background:'#0c0c0c',border:'1px solid #222',color:'#ddd',padding:6,borderRadius:6,width:'100%'}}
