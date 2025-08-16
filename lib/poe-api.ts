@@ -792,6 +792,26 @@ private oauthConfig: OAuthConfig = {
       }
 
   if (!res.ok) {
+        // If server-side proxy fails with IP blocking, try client-side approach
+        if (res.status === 403 && typeof window !== 'undefined' && userSessionId) {
+          console.log('[poe-api] Server proxy blocked, trying client-side approach')
+          try {
+            const { clientTradeAPI } = await import('./client-trade-api')
+            const clientResult = await clientTradeAPI.searchTrade({
+              league,
+              query,
+              sessionId: userSessionId
+            })
+            return {
+              id: clientResult.id,
+              total: clientResult.total,
+              result: clientResult.result.slice(0, 100)
+            }
+          } catch (clientError) {
+            console.error('[poe-api] Client-side fallback also failed:', clientError)
+            // Continue with original error handling
+          }
+        }
         const bodySnippet = text ? (text.length > 2000 ? text.slice(0,2000) + '... [truncated]' : text) : ''
         const info = parsed ? JSON.stringify(parsed) : bodySnippet
         // Detect upstream rate limit (sometimes wrapped by proxy as 502 containing upstream 429)

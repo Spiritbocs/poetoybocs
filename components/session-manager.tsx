@@ -29,18 +29,51 @@ export function SessionManager({ onSessionReady, isTradeEnabled, league }: Sessi
   const validateSession = async (id: string) => {
     setIsValidating(true)
     try {
-      const res = await fetch('/api/session/validate', {
+      // First try server-side validation
+      const serverRes = await fetch('/api/session/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: id, league })
       })
       
-      const result = await res.json()
-      setValidationResult(result)
+      const serverResult = await serverRes.json()
       
-      if (result.valid) {
+      // If server-side works, great!
+      if (serverResult.valid) {
+        setValidationResult(serverResult)
         localStorage.setItem('poe_session_id', id)
         onSessionReady(id)
+        setIsValidating(false)
+        return
+      }
+      
+      // If server-side fails, try client-side approach
+      if (typeof window !== 'undefined') {
+        try {
+          const { clientTradeAPI } = await import('../lib/client-trade-api')
+          const clientTest = await clientTradeAPI.testConnection(league, id)
+          
+          if (clientTest.success) {
+            setValidationResult({
+              valid: true,
+              message: `Session working via ${clientTest.method} method (bypassing server IP blocks)`
+            })
+            localStorage.setItem('poe_session_id', id)
+            onSessionReady(id)
+          } else {
+            setValidationResult({
+              valid: false,
+              message: `Both server and client validation failed: ${clientTest.error}`
+            })
+          }
+        } catch (clientError) {
+          setValidationResult({
+            valid: false,
+            message: `Server failed, client fallback error: ${clientError}`
+          })
+        }
+      } else {
+        setValidationResult(serverResult)
       }
     } catch (error) {
       setValidationResult({
