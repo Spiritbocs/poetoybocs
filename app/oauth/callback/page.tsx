@@ -16,29 +16,37 @@ export default function OAuthCallback() {
       const state = searchParams.get("state")
       const error = searchParams.get("error")
 
+      console.log("[OAuth Callback] Received parameters:", { code: code?.substring(0, 8), state: state?.substring(0, 8), error })
+
       if (error) {
+        console.log("[OAuth Callback] OAuth error received:", error)
         setStatus("error")
         setError(`OAuth error: ${error}`)
         return
       }
 
       if (!code) {
+        console.log("[OAuth Callback] No authorization code received")
         setStatus("error")
         setError("No authorization code received")
         return
       }
 
       if (!state) {
+        console.log("[OAuth Callback] No state parameter received")
         setStatus("error")
         setError("No state parameter received")
         return
       }
 
       try {
+        console.log("[OAuth Callback] Starting token exchange...")
         await poeApi.exchangeCodeForToken(code, state)
+        console.log("[OAuth Callback] Token exchange successful")
         setStatus("success")
         setTimeout(() => router.push("/"), 1500)
       } catch (err: any) {
+        console.error("[OAuth Callback] Token exchange failed:", err)
         setStatus("error")
         const msg = err?.message || (typeof err === 'string' ? err : 'Authentication failed')
         setError(msg)
