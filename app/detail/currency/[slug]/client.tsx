@@ -72,7 +72,7 @@ export default function CurrencyDetailClient({ initialLine, slug, league, realm 
             <div style={{marginTop:20,fontSize:11,opacity:.45}}>Longer timeframes coming soon (needs history endpoint).</div>
           </div>
         </div>
-        <div style={{width:430,display:'flex',flexDirection:'column',gap:20}}>
+  <div style={{width:480,display:'flex',flexDirection:'column',gap:20}}>
           <div style={{background:'#161616',padding:'16px 18px',border:'1px solid #2a2a2a',borderRadius:8}}>
             <div style={{fontSize:13,opacity:.8,marginBottom:10}}>Wiki</div>
             {wikiTitle && <WikiContent title={wikiTitle} />}

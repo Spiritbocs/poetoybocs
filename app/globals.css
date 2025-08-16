@@ -150,9 +150,9 @@ body {
 }
 
 .container {
-  max-width: 1400px;
+  max-width: 1680px; /* widened from 1400px for more breathing room */
   margin: 0 auto;
-  padding: 20px;
+  padding: 24px 28px; /* slightly increased horizontal/vertical padding */
 }
 
 /* Header */

@@ -1049,9 +1049,10 @@ export function ItemPriceChecker() {
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
             {/* Paste box + toolbar (matches poeprices query flow). The compact item preview is rendered to the right after the user submits. */}
             <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
-              <div style={{background:'#0b0b0b',border:'1px solid #222',padding:6,borderRadius:8,width:430}}>
+              <div style={{background:'#0b0b0b',border:'1px solid #222',padding:6,borderRadius:8,width:520}}>
                 <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
-                  <select value={priceDisplayMode} onChange={e=> setPriceDisplayMode(e.target.value as any)} style={{background:'#1e1e1e',border:'1px solid #333',color:'#ddd',fontSize:12,padding:'4px 6px',borderRadius:6}}>
+                  <label htmlFor="priceDisplayMode" style={{fontSize:11,opacity:.7,letterSpacing:.5}}>Buyout Price</label>
+                  <select id="priceDisplayMode" value={priceDisplayMode} onChange={e=> setPriceDisplayMode(e.target.value as any)} style={{background:'#1e1e1e',border:'1px solid #333',color:'#ddd',fontSize:12,padding:'4px 6px',borderRadius:6}}>
                     <option value="chaos">Chaos</option>
                     <option value="auto">Chaos/Div</option>
                     <option value="equiv">Chaos ≡</option>

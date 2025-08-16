@@ -75,7 +75,7 @@ export default function ItemDetailClient({ initialItem, slug, league, type, real
             <div style={{marginTop:20,fontSize:11,opacity:.45}}>Longer timeframes coming soon (needs history endpoint).</div>
           </div>
         </div>
-        <div style={{width:430,display:'flex',flexDirection:'column',gap:20}}>
+  <div style={{width:480,display:'flex',flexDirection:'column',gap:20}}>
           <div style={{background:'#161616',padding:'18px 20px 14px',border:'1px solid #2a2a2a',borderRadius:8}}>
             <div style={{fontSize:13,letterSpacing:.5,opacity:.8,marginBottom:10}}>Item Information</div>
             {item.icon && <img src={item.icon} alt="" style={{width:54,height:54,objectFit:'contain',marginBottom:8}} />}
