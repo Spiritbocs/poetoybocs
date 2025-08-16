@@ -261,6 +261,8 @@ export function ItemPriceChecker() {
         if (typeof e?.message === 'string' && e.message.startsWith('rate_limited:')) {
           const secs = parseInt(e.message.split(':')[1]||'0',10)
           setError(`Rate limited – wait ${secs}s before retrying.`)
+        } else if (typeof e?.message === 'string' && e.message.startsWith('forbidden_upstream:')) {
+          setError('Forbidden by upstream trade site (Cloudflare). Try again in a minute; if persistent, open trade site in a browser tab to refresh cookies.')
         } else {
           setError('Search failed')
         }
@@ -414,7 +416,9 @@ export function ItemPriceChecker() {
     const secs = parseInt(raw.split(':')[1]||'0',10)
     msg = `Rate limited – wait ${secs}s before retrying.`
   }
-  if ((raw||'').startsWith('proxy_http_')) {
+  if ((raw||'').startsWith('forbidden_upstream:')) {
+    msg = 'Forbidden by upstream trade site (Cloudflare). Try again shortly or open the official trade site once to establish cookies.'
+  } else if ((raw||'').startsWith('proxy_http_')) {
     const payload = raw.replace(/^proxy_http_\d+\s*/, '')
     try {
       const parsedPayload = JSON.parse(payload)

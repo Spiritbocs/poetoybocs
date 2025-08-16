@@ -1,4 +1,6 @@
 export const dynamic = 'force-dynamic'
+// Force Node.js runtime (avoid Edge subtle header differences that may trigger upstream 403)
+export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 
 // Simple proxy to PoE trade search API to bypass browser CORS restrictions
@@ -14,12 +16,12 @@ export async function POST(req: Request) {
     if (process.env.USE_TRADE_PROXY === 'false') {
       return NextResponse.json({ error: 'trade_proxy_disabled', message: 'Trade proxy is disabled by server configuration' }, { status: 503 })
     }
-    const { league, query } = body
-    const upstream = `https://www.pathofexile.com/api/trade/search/${encodeURIComponent(league)}`
+  const { league, query } = body
+  const upstream = `https://www.pathofexile.com/api/trade/search/${encodeURIComponent(league)}`
 
     const defaultUA = process.env.POE_TRADE_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
 
-    async function doSearch(): Promise<{ ok:boolean; status:number; statusText:string; json?:any; text?:string }> {
+  async function doSearch(extraHeaders:Record<string,string> = {}): Promise<{ ok:boolean; status:number; statusText:string; json?:any; text?:string }> {
       const res = await fetch(upstream, {
         method: 'POST',
         headers: {
@@ -27,8 +29,14 @@ export async function POST(req: Request) {
           'Accept': 'application/json, text/plain, */*',
           'Accept-Language': 'en-US,en;q=0.9',
           'User-Agent': defaultUA,
-          'Origin': 'https://www.pathofexile.com',
-          'Referer': 'https://www.pathofexile.com/trade/search'
+      'Origin': 'https://www.pathofexile.com',
+      // Use league-specific referer (mirrors real site navigation) which may help Cloudflare heuristics
+      'Referer': `https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}`,
+      'X-Requested-With': 'XMLHttpRequest',
+      'Sec-Fetch-Site': 'same-origin',
+      'Sec-Fetch-Mode': 'cors',
+      'Sec-Fetch-Dest': 'empty',
+      ...extraHeaders
         },
         body: JSON.stringify(query),
         cache: 'no-store'
@@ -45,9 +53,16 @@ export async function POST(req: Request) {
     // If forbidden (Cloudflare / upstream) try a lightweight warm-up fetch then retry once.
     if (!attempt.ok && attempt.status === 403) {
       try {
-        await fetch('https://www.pathofexile.com/api/trade/data/leagues', { headers:{ 'User-Agent': defaultUA, 'Accept':'application/json' }, cache:'no-store' })
+        // Warm-up endpoints (leagues + items) to simulate normal browsing sequence
+        await fetch('https://www.pathofexile.com/api/trade/data/leagues', { headers:{ 'User-Agent': defaultUA, 'Accept':'application/json, text/plain, */*' }, cache:'no-store' })
+        await fetch('https://www.pathofexile.com/api/trade/data/items', { headers:{ 'User-Agent': defaultUA, 'Accept':'application/json, text/plain, */*' }, cache:'no-store' })
       } catch {}
       attempt = await doSearch()
+    }
+    // Final contingency: minor UA variance (some CDNs fingerprint exact UA string)
+    if (!attempt.ok && attempt.status === 403) {
+      const variedUA = defaultUA.replace(/Chrome\/(\d+)/, (m, v)=> `Chrome/${v}.${Math.floor(Math.random()*10)}`)
+      attempt = await doSearch({ 'User-Agent': variedUA })
     }
     if (!attempt.ok) {
       const bodyText = attempt.text || ''
