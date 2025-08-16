@@ -155,7 +155,28 @@ export function TopNav() {
               <button onClick={handleLogout} style={btnStyle}>Disconnect</button>
             </>
           )}
-          <a href="https://discord.com/users/625796542456004639" target="_blank" rel="noopener noreferrer" style={btnStyle}>Support</a>
+          <button
+            onClick={() => {
+              const userId = '625796542456004639'
+              const deepLink = `discord://-/users/${userId}`
+              const webLink = `https://discord.com/users/${userId}`
+              let opened = false
+              try {
+                // Attempt deep link
+                window.location.href = deepLink
+                opened = true
+              } catch {}
+              // Fallback after short delay if Discord protocol not handled
+              setTimeout(()=>{
+                // Heuristic: if page still visible and protocol likely failed, open web
+                if (!document.hidden) {
+                  window.open(webLink, '_blank', 'noopener,noreferrer')
+                }
+              }, 900)
+            }}
+            style={btnStyle}
+            title="Open Discord (fallback to web profile)"
+          >Support</button>
         </div>
       </div>
     </nav>
