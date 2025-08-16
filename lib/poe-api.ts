@@ -767,11 +767,20 @@ private oauthConfig: OAuthConfig = {
     // Use internal proxy to avoid CORS & reduce payload
     try {
   const externalBase = (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_EXTERNAL_TRADE_PROXY : undefined) || (typeof window !== 'undefined' ? (window as any).NEXT_PUBLIC_EXTERNAL_TRADE_PROXY : undefined)
-  const searchEndpoint = externalBase ? `${externalBase.replace(/\/$/,'')}/search` : '/api/trade/search'
+  const searchEndpoint = externalBase ? `${externalBase.replace(/\/$/,'')}/search` : '/api/trade/search-with-session'
+  
+  // Get user session ID from localStorage if available
+  const userSessionId = typeof window !== 'undefined' ? localStorage.getItem('poe_session_id') : null
+  
+  const requestBody: any = { league, query }
+  if (userSessionId) {
+    requestBody.sessionId = userSessionId
+  }
+  
   const res = await fetch(searchEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ league, query })
+        body: JSON.stringify(requestBody)
       })
 
       // Capture response body for diagnostics whether ok or not

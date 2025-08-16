@@ -6,19 +6,35 @@ import { CurrencyTracker } from "@/components/currency-tracker"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { ItemOverviewTable } from "@/components/item-overview-table"
 import { ItemPriceChecker } from "@/components/item-price-checker"
+import { SessionManager } from "@/components/session-manager"
 import { useLeague } from "@/components/league-context"
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"currency" | "items">("currency")
+  const [sessionReady, setSessionReady] = useState(false)
+  const [userSessionId, setUserSessionId] = useState<string>('')
+  
   // Consume shared league/realm from context (TopNav now manages selection)
   const { league, realm } = useLeague()
   const [activeSection, setActiveSection] = useState<{ key: string; label: string; type?: "Currency" | "Fragment" }>({ key: 'currency', label: 'Currency', type: 'Currency' })
+
+  const handleSessionReady = (sessionId: string) => {
+    setUserSessionId(sessionId)
+    setSessionReady(true)
+  }
 
   return (
     <>
   <TopNav />
     <div className="container" style={{paddingTop:'16px'}}>
   {/* Header removed per request; content condenses upward */}
+
+      {/* Session Manager - shows when trade features are not ready */}
+      {!sessionReady && (
+        <div style={{ marginBottom: '2rem' }}>
+          <SessionManager onSessionReady={handleSessionReady} isTradeEnabled={sessionReady} />
+        </div>
+      )}
 
       <div className="layout-split">
         <SidebarNav
