@@ -6,6 +6,48 @@ import { NextResponse } from 'next/server'
 // Basic in-memory adaptive backoff when repeated 403s occur (resets on success)
 let consecutiveForbidden = 0
 let lastForbiddenAt = 0
+let cookieHeader: string | null = null
+let cookieFetchInFlight: Promise<void> | null = null
+
+async function ensureCookies(league: string) {
+  if (cookieHeader || cookieFetchInFlight) {
+    if (cookieFetchInFlight) {
+      try { await cookieFetchInFlight } catch { /* ignore */ }
+    }
+    return
+  }
+  cookieFetchInFlight = (async () => {
+    try {
+      // Hitting a real trade search page to obtain Cloudflare / site cookies.
+      const url = `https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}`
+      const res = await fetch(url, { method: 'GET', redirect: 'manual', headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml' }, cache: 'no-store' })
+      // Attempt to extract all set-cookie headers
+      let cookies: string[] = []
+      const single = res.headers.get('set-cookie')
+      if (single) cookies.push(single)
+      const rawFn = (res.headers as any).raw ? (res.headers as any).raw : (res as any).headers?.raw
+      if (rawFn) {
+        try {
+          const raw = rawFn.call(res.headers)
+          if (raw && raw['set-cookie']) {
+            cookies = raw['set-cookie']
+          }
+        } catch { /* ignore */ }
+      }
+      // Normalize into Cookie header form (only name=value parts)
+      const simple = cookies.map(c => c.split(';')[0]).filter(Boolean)
+      if (simple.length) {
+        cookieHeader = simple.join('; ')
+        console.log('[trade/search] acquired cookies', simple.map(s=> s.split('=')[0]))
+      }
+    } catch (e) {
+      console.warn('[trade/search] cookie acquisition failed', e)
+    } finally {
+      cookieFetchInFlight = null
+    }
+  })()
+  await cookieFetchInFlight
+}
 
 // Simple proxy to PoE trade search API to bypass browser CORS restrictions
 // Body: { league: string, query: any }
@@ -45,6 +87,7 @@ export async function POST(req: Request) {
       'Sec-Fetch-Site': 'same-origin',
       'Sec-Fetch-Mode': 'cors',
       'Sec-Fetch-Dest': 'empty',
+      ...(cookieHeader ? { 'Cookie': cookieHeader } : {}),
       ...extraHeaders
         },
         body: JSON.stringify(query),
@@ -68,13 +111,18 @@ export async function POST(req: Request) {
     }
     let attempt = await doSearch()
     // If forbidden (Cloudflare / upstream) try a lightweight warm-up fetch then retry once.
-  if (!attempt.ok && attempt.status === 403) {
+    if (!attempt.ok && attempt.status === 403) {
       try {
         // Warm-up endpoints (leagues + items) to simulate normal browsing sequence
         await fetch('https://www.pathofexile.com/api/trade/data/leagues', { headers:{ 'User-Agent': defaultUA, 'Accept':'application/json, text/plain, */*' }, cache:'no-store' })
         await fetch('https://www.pathofexile.com/api/trade/data/items', { headers:{ 'User-Agent': defaultUA, 'Accept':'application/json, text/plain, */*' }, cache:'no-store' })
     await fetch('https://www.pathofexile.com/api/trade/data/static', { headers:{ 'User-Agent': defaultUA, 'Accept':'application/json, text/plain, */*' }, cache:'no-store' })
       } catch {}
+      attempt = await doSearch()
+    }
+    // Acquire cookies and retry if still forbidden and no cookie yet
+    if (!attempt.ok && attempt.status === 403 && !cookieHeader) {
+      await ensureCookies(league)
       attempt = await doSearch()
     }
     // Final contingency: minor UA variance (some CDNs fingerprint exact UA string)
