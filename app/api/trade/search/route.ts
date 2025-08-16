@@ -3,10 +3,30 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 
+// Optional: if a POE session id is provided (value of POESESSID cookie), include it to reduce Cloudflare blocking.
+// This should be added as an environment variable POE_TRADE_SESSION_ID (never expose to client).
+const sessionId = (process.env.POE_TRADE_SESSION_ID || '').trim()
+let sessionCookieEnabled = !!sessionId
+
 // Basic in-memory adaptive backoff when repeated 403s occur (resets on success)
 let consecutiveForbidden = 0
 let lastForbiddenAt = 0
-let cookieHeader: string | null = null
+let cookieHeader: string | null = null // dynamically acquired cookies (Cloudflare / site)
+// We keep a composed cookie string including optional user-provided POESESSID
+function buildCookieHeader(extra: string | null = null) {
+  const parts: string[] = []
+  if (sessionCookieEnabled && sessionId) parts.push(`POESESSID=${sessionId}`)
+  if (cookieHeader) parts.push(cookieHeader)
+  if (extra) parts.push(extra)
+  if (!parts.length) return undefined
+  // De-dupe by cookie name (simple approach)
+  const byName: Record<string,string> = {}
+  for (const p of parts.join('; ').split(/;\s*/)) {
+    const [k,v] = p.split('=')
+    if (k && v && !byName[k]) byName[k] = v
+  }
+  return Object.entries(byName).map(([k,v])=> `${k}=${v}`).join('; ')
+}
 let cookieFetchInFlight: Promise<void> | null = null
 
 async function ensureCookies(league: string) {
@@ -38,7 +58,7 @@ async function ensureCookies(league: string) {
       const simple = cookies.map(c => c.split(';')[0]).filter(Boolean)
       if (simple.length) {
         cookieHeader = simple.join('; ')
-        console.log('[trade/search] acquired cookies', simple.map(s=> s.split('=')[0]))
+  console.log('[trade/search] acquired cookies', simple.map(s=> s.split('=')[0]).join(','), sessionCookieEnabled ? '+ session' : '')
       }
     } catch (e) {
       console.warn('[trade/search] cookie acquisition failed', e)
@@ -87,7 +107,7 @@ export async function POST(req: Request) {
       'Sec-Fetch-Site': 'same-origin',
       'Sec-Fetch-Mode': 'cors',
       'Sec-Fetch-Dest': 'empty',
-      ...(cookieHeader ? { 'Cookie': cookieHeader } : {}),
+      ...(buildCookieHeader() ? { 'Cookie': buildCookieHeader()! } : {}),
       ...extraHeaders
         },
         body: JSON.stringify(query),
@@ -111,7 +131,7 @@ export async function POST(req: Request) {
     }
     let attempt = await doSearch()
     // If forbidden (Cloudflare / upstream) try a lightweight warm-up fetch then retry once.
-    if (!attempt.ok && attempt.status === 403) {
+  if (!attempt.ok && attempt.status === 403) {
       try {
         // Warm-up endpoints (leagues + items) to simulate normal browsing sequence
         await fetch('https://www.pathofexile.com/api/trade/data/leagues', { headers:{ 'User-Agent': defaultUA, 'Accept':'application/json, text/plain, */*' }, cache:'no-store' })
@@ -124,6 +144,10 @@ export async function POST(req: Request) {
     if (!attempt.ok && attempt.status === 403 && !cookieHeader) {
       await ensureCookies(league)
       attempt = await doSearch()
+    }
+    // If still 403 and we have a session cookie configured but it wasn't yet appended (should already be), force a retry with explicit composed cookie
+    if (!attempt.ok && attempt.status === 403 && sessionCookieEnabled) {
+      attempt = await doSearch({ 'Cookie': buildCookieHeader() || '' })
     }
     // Final contingency: minor UA variance (some CDNs fingerprint exact UA string)
     if (!attempt.ok && attempt.status === 403) {
@@ -141,7 +165,17 @@ export async function POST(req: Request) {
       } else {
         consecutiveForbidden = 0
       }
-      return NextResponse.json({ error: 'upstream_error', status: attempt.status, statusText: attempt.statusText, body: truncated, hint: attempt.status===403 ? 'Forbidden – upstream may be blocking serverless IP range. Consider external proxy or self-host.' : undefined }, { status: attempt.status })
+      return NextResponse.json({
+        error: 'upstream_error',
+        status: attempt.status,
+        statusText: attempt.statusText,
+        body: truncated,
+        hint: attempt.status===403 ? (
+          'Forbidden – upstream likely blocking this deployment IP range. Options: (1) Set POE_TRADE_SESSION_ID env var with your POESESSID cookie (never expose client-side), (2) Provide a self-hosted proxy / dedicated server IP, (3) Run locally.'
+        ) : undefined,
+        sessionAttached: sessionCookieEnabled,
+        consecutiveForbidden
+      }, { status: attempt.status })
     }
     consecutiveForbidden = 0
     const json = attempt.json ?? {}
