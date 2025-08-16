@@ -744,7 +744,9 @@ private oauthConfig: OAuthConfig = {
     }
     // Use internal proxy to avoid CORS & reduce payload
     try {
-      const res = await fetch('/api/trade/search', {
+  const externalBase = (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_EXTERNAL_TRADE_PROXY : undefined) || (typeof window !== 'undefined' ? (window as any).NEXT_PUBLIC_EXTERNAL_TRADE_PROXY : undefined)
+  const searchEndpoint = externalBase ? `${externalBase.replace(/\/$/,'')}/search` : '/api/trade/search'
+  const res = await fetch(searchEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ league, query })
@@ -823,7 +825,9 @@ private oauthConfig: OAuthConfig = {
         if (since < tradeMinFetchInterval) {
           await sleep(tradeMinFetchInterval - since)
         }
-        const res = await fetch('/api/trade/fetch', {
+  const externalBase = (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_EXTERNAL_TRADE_PROXY : undefined) || (typeof window !== 'undefined' ? (window as any).NEXT_PUBLIC_EXTERNAL_TRADE_PROXY : undefined)
+  const fetchEndpoint = externalBase ? `${externalBase.replace(/\/$/,'')}/fetch` : '/api/trade/fetch'
+  const res = await fetch(fetchEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ids, query: String(searchId) })
