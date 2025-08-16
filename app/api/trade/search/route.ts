@@ -3,6 +3,10 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 
+// Basic in-memory adaptive backoff when repeated 403s occur (resets on success)
+let consecutiveForbidden = 0
+let lastForbiddenAt = 0
+
 // Simple proxy to PoE trade search API to bypass browser CORS restrictions
 // Body: { league: string, query: any }
 // Returns a trimmed subset of the upstream response: id, total count, and result id list (capped)
@@ -19,7 +23,12 @@ export async function POST(req: Request) {
   const { league, query } = body
   const upstream = `https://www.pathofexile.com/api/trade/search/${encodeURIComponent(league)}`
 
-    const defaultUA = process.env.POE_TRADE_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+    const uaPool = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15'
+    ]
+    const defaultUA = process.env.POE_TRADE_USER_AGENT || uaPool[Math.floor(Math.random()*uaPool.length)]
 
   async function doSearch(extraHeaders:Record<string,string> = {}): Promise<{ ok:boolean; status:number; statusText:string; json?:any; text?:string }> {
       const res = await fetch(upstream, {
@@ -49,13 +58,22 @@ export async function POST(req: Request) {
     }
 
     // First attempt
+    // Light adaptive delay if many 403s recently to avoid hammering
+    if (consecutiveForbidden >= 3) {
+      const since = Date.now() - lastForbiddenAt
+      const backoff = Math.min(4000, 500 * consecutiveForbidden)
+      if (since < backoff) {
+        await new Promise(r=> setTimeout(r, backoff - since))
+      }
+    }
     let attempt = await doSearch()
     // If forbidden (Cloudflare / upstream) try a lightweight warm-up fetch then retry once.
-    if (!attempt.ok && attempt.status === 403) {
+  if (!attempt.ok && attempt.status === 403) {
       try {
         // Warm-up endpoints (leagues + items) to simulate normal browsing sequence
         await fetch('https://www.pathofexile.com/api/trade/data/leagues', { headers:{ 'User-Agent': defaultUA, 'Accept':'application/json, text/plain, */*' }, cache:'no-store' })
         await fetch('https://www.pathofexile.com/api/trade/data/items', { headers:{ 'User-Agent': defaultUA, 'Accept':'application/json, text/plain, */*' }, cache:'no-store' })
+    await fetch('https://www.pathofexile.com/api/trade/data/static', { headers:{ 'User-Agent': defaultUA, 'Accept':'application/json, text/plain, */*' }, cache:'no-store' })
       } catch {}
       attempt = await doSearch()
     }
@@ -69,8 +87,15 @@ export async function POST(req: Request) {
       const truncated = bodyText.length > 2000 ? bodyText.slice(0,2000) + '... [truncated]' : bodyText
       // Pass through real upstream status (avoid masking 403 as 502) for clearer client handling
       console.error(`Trade search upstream non-ok: ${attempt.status} ${attempt.statusText} - ${truncated}`)
-      return NextResponse.json({ error: 'upstream_error', status: attempt.status, statusText: attempt.statusText, body: truncated }, { status: attempt.status })
+      if (attempt.status === 403) {
+        consecutiveForbidden++
+        lastForbiddenAt = Date.now()
+      } else {
+        consecutiveForbidden = 0
+      }
+      return NextResponse.json({ error: 'upstream_error', status: attempt.status, statusText: attempt.statusText, body: truncated, hint: attempt.status===403 ? 'Forbidden – upstream may be blocking serverless IP range. Consider external proxy or self-host.' : undefined }, { status: attempt.status })
     }
+    consecutiveForbidden = 0
     const json = attempt.json ?? {}
     // Cap result ids to avoid huge payloads
     const result: string[] = Array.isArray(json?.result) ? json.result.slice(0, 100) : []
