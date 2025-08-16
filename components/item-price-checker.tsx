@@ -1194,8 +1194,7 @@ export function ItemPriceChecker() {
                       <div style={{display:'flex',alignItems:'center',gap:16,fontSize:12,opacity:.8,marginBottom:6}}>
                         <div>Matched: {noFilterMatch ? 0 : searchResults.length}</div>
                         <div>•</div>
-                        <div>Online</div>
-                        <div style={{marginLeft:'auto'}}><a href="#" onClick={(e)=>e.preventDefault()} style={{color:'#67bfff',textDecoration:'none'}}>Trade ↗</a></div>
+                        <div style={{ color: '#57d977' }}>Online</div>
                       </div>
                       <div style={{background:'#0c0c0c',border:'1px solid #1a1a1a',borderRadius:6,overflow:'hidden'}}>
                         <div style={{display:'grid',gridTemplateColumns:'120px 1fr',fontSize:11,background:'#111',padding:'6px 10px',color:'#bbb',letterSpacing:.5}}>
