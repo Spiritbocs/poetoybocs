@@ -16,28 +16,47 @@ export async function POST(req: Request) {
     }
     const { league, query } = body
     const upstream = `https://www.pathofexile.com/api/trade/search/${encodeURIComponent(league)}`
-    const res = await fetch(upstream, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'spiritbocs-tracker/1.0 (+trade-proxy)'
-      },
-      body: JSON.stringify(query),
-      cache: 'no-store'
-    })
-    if (!res.ok) {
-      // Try to read upstream body for diagnostics
-      let bodyText = ''
-      try {
-        bodyText = await res.text()
-      } catch (e) {
-        bodyText = `<failed to read body: ${String(e)}>`
-      }
-      const truncated = bodyText.length > 2000 ? bodyText.slice(0,2000) + '... [truncated]' : bodyText
-      console.error(`Trade search upstream non-ok: ${res.status} ${res.statusText} - ${truncated}`)
-      return NextResponse.json({ error: 'upstream_error', status: res.status, statusText: res.statusText, body: truncated }, { status: 502 })
+
+    const defaultUA = process.env.POE_TRADE_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+
+    async function doSearch(): Promise<{ ok:boolean; status:number; statusText:string; json?:any; text?:string }> {
+      const res = await fetch(upstream, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'User-Agent': defaultUA,
+          'Origin': 'https://www.pathofexile.com',
+          'Referer': 'https://www.pathofexile.com/trade/search'
+        },
+        body: JSON.stringify(query),
+        cache: 'no-store'
+      })
+      let text = ''
+      try { text = await res.text() } catch {}
+      let parsed: any = undefined
+      if (text) { try { parsed = JSON.parse(text) } catch { /* ignore */ } }
+      return { ok: res.ok, status: res.status, statusText: res.statusText, json: parsed, text }
     }
-    const json = await res.json()
+
+    // First attempt
+    let attempt = await doSearch()
+    // If forbidden (Cloudflare / upstream) try a lightweight warm-up fetch then retry once.
+    if (!attempt.ok && attempt.status === 403) {
+      try {
+        await fetch('https://www.pathofexile.com/api/trade/data/leagues', { headers:{ 'User-Agent': defaultUA, 'Accept':'application/json' }, cache:'no-store' })
+      } catch {}
+      attempt = await doSearch()
+    }
+    if (!attempt.ok) {
+      const bodyText = attempt.text || ''
+      const truncated = bodyText.length > 2000 ? bodyText.slice(0,2000) + '... [truncated]' : bodyText
+      // Pass through real upstream status (avoid masking 403 as 502) for clearer client handling
+      console.error(`Trade search upstream non-ok: ${attempt.status} ${attempt.statusText} - ${truncated}`)
+      return NextResponse.json({ error: 'upstream_error', status: attempt.status, statusText: attempt.statusText, body: truncated }, { status: attempt.status })
+    }
+    const json = attempt.json ?? {}
     // Cap result ids to avoid huge payloads
     const result: string[] = Array.isArray(json?.result) ? json.result.slice(0, 100) : []
     return NextResponse.json({ id: json?.id, total: json?.total ?? 0, result })

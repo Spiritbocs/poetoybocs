@@ -690,7 +690,7 @@ private oauthConfig: OAuthConfig = {
         try { parsed = JSON.parse(text) } catch { parsed = null }
       }
 
-      if (!res.ok) {
+  if (!res.ok) {
         const bodySnippet = text ? (text.length > 2000 ? text.slice(0,2000) + '... [truncated]' : text) : ''
         const info = parsed ? JSON.stringify(parsed) : bodySnippet
         // Detect upstream rate limit (sometimes wrapped by proxy as 502 containing upstream 429)
@@ -706,7 +706,8 @@ private oauthConfig: OAuthConfig = {
             tradeMinFetchInterval = Math.min(900, 250 + rateLimitedSeconds*20)
           }
         }
-        const err = new Error(rateLimitedSeconds !== null ? `rate_limited:${rateLimitedSeconds}` : `proxy_http_${res.status} ${info}`)
+  // Distinguish 403 (forbidden upstream) so UI can hint at Cloudflare / missing cookies
+  const err = new Error(rateLimitedSeconds !== null ? `rate_limited:${rateLimitedSeconds}` : (res.status === 403 ? `forbidden_upstream:${info}` : `proxy_http_${res.status} ${info}`))
         const debug = (typeof process !== 'undefined') ? process.env.NEXT_PUBLIC_DEBUG_TRADE === 'true' : false
         if (debug) {
           console.error('Trade search proxy non-ok:', res.status, res.statusText, bodySnippet)

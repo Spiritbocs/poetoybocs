@@ -18,14 +18,23 @@ export async function POST(req: Request) {
   const ids: string[] = body.ids.slice(0, 10)
     const query: string = body.query
     const upstream = `https://www.pathofexile.com/api/trade/fetch/${ids.join(',')}?query=${encodeURIComponent(query)}`
-  console.log(`[trade/fetch] incoming ids=${ids.length} queryType=${typeof query} queryLen=${String(query).length} querySample=${String(query).slice(0,200)}`)
-    const res = await fetch(upstream, { headers: { 'User-Agent': 'spiritbocs-tracker/1.0 (+trade-fetch)' }, cache: 'no-store' })
+    console.log(`[trade/fetch] incoming ids=${ids.length} queryType=${typeof query} queryLen=${String(query).length} querySample=${String(query).slice(0,200)}`)
+    const defaultUA = process.env.POE_TRADE_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+    const res = await fetch(upstream, {
+      headers: {
+        'Accept': 'application/json, text/plain, */*',
+        'User-Agent': defaultUA,
+        'Origin': 'https://www.pathofexile.com',
+        'Referer': 'https://www.pathofexile.com/trade/search'
+      },
+      cache: 'no-store'
+    })
     if (!res.ok) {
       let bodyText = ''
       try { bodyText = await res.text() } catch (e) { bodyText = `<failed to read body: ${String(e)}>` }
       const truncated = bodyText.length > 2000 ? bodyText.slice(0,2000) + '... [truncated]' : bodyText
       console.error(`[trade/fetch] upstream non-ok status=${res.status} statusText=${res.statusText} body=${truncated}`)
-      return NextResponse.json({ error: 'upstream_error', status: res.status, statusText: res.statusText, body: truncated }, { status: 502 })
+      return NextResponse.json({ error: 'upstream_error', status: res.status, statusText: res.statusText, body: truncated }, { status: res.status })
     }
     const json = await res.json()
     return NextResponse.json({ result: json?.result || [] })

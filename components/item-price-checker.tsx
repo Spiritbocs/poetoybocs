@@ -282,7 +282,7 @@ export function ItemPriceChecker() {
         const parsedP = p
         const query = buildTradeQueryFromParsed(parsedP)
         setLastQuery(query)
-        let searchResult: any
+             let searchResult: any
         try {
           searchResult = await poeApi.searchItems(selectedLeague, query)
         } catch (err:any) {
@@ -310,8 +310,6 @@ export function ItemPriceChecker() {
                 setLastQuery(fallbackQuery)
                 setTradeSearchId(retry.id)
                 searchResult = retry as any
-              } else {
-                // proceed to next fallback
               }
             } catch {/* ignore and continue */}
           }
