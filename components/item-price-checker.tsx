@@ -27,6 +27,11 @@ export function ItemPriceChecker() {
   } | null>(null)
   const [showExplain,setShowExplain] = useState(false)
   const [exactPrice, setExactPrice] = useState<{ average: number; currency: string } | null>(null)
+  // Per-item cooldown (to avoid hammering trade API & 429s)
+  const COOLDOWN_MS = 60_000
+  const [cooldownRemaining, setCooldownRemaining] = useState<number>(0)
+  const [cooldownActiveKey, setCooldownActiveKey] = useState<string | null>(null)
+  const COOLDOWN_TOOLTIP = "This progress bar shows a 60 second cooldown for this exact item (base + enabled mods) to prevent hitting Path of Exile trade API rate limits (429 Too Many Requests). You can still price different items immediately. When the bar empties or shows 0s, you may re-check this item. This helps keep the tool fast for everyone and avoids forced delays from the API.".replace(/\s+/g,' ').trim()
   const [error, setError] = useState<string | null>(null)
   const [tradeSearchId, setTradeSearchId] = useState<string | null>(null)
   // Quick filter state (mirrors the overlay)
@@ -189,6 +194,38 @@ export function ItemPriceChecker() {
   const handleSearch = async () => {
     setError(null)
   setSearchPerformed(true)
+    // Build a stable key for current search (clipboard or simple)
+    const buildKey = () => {
+      if (mode==='clipboard') {
+        const txt = rawClipboard.replace(/\r/g,'').trim()
+        // simple hash
+        let h = 0
+        for (let i=0;i<txt.length;i++) { h = (h<<5) - h + txt.charCodeAt(i); h |= 0 }
+        return 'clip:' + h
+      } else {
+        const term = searchTerm.trim().toLowerCase()
+        let h = 0
+        for (let i=0;i<term.length;i++) { h = (h<<5) - h + term.charCodeAt(i); h |= 0 }
+        return 'simple:' + h
+      }
+    }
+    const key = buildKey()
+    const now = Date.now()
+    let map: Record<string, number> = {}
+    try { const raw = localStorage.getItem('price_check_cooldowns'); if (raw) map = JSON.parse(raw) } catch {}
+    const lastTs = map[key]
+    if (lastTs && now - lastTs < COOLDOWN_MS) {
+      const remaining = COOLDOWN_MS - (now - lastTs)
+      setCooldownActiveKey(key)
+      setCooldownRemaining(remaining)
+      setError(`Cooldown – wait ${Math.ceil(remaining/1000)}s before rechecking this item.`)
+      return
+    }
+    // Record start of new cooldown (even if request later errors) to guard against rapid retries
+    map[key] = now
+    try { localStorage.setItem('price_check_cooldowns', JSON.stringify(map)); localStorage.setItem('price_check_active_key', key) } catch {}
+    setCooldownActiveKey(key)
+    setCooldownRemaining(COOLDOWN_MS)
     if (mode==='simple') {
       if (!searchTerm.trim()) return
       setLoading(true)
@@ -1027,6 +1064,60 @@ export function ItemPriceChecker() {
 
   // Removed inline SVG CurrencyIcon (using actual game asset icons like currency tracker)
 
+  // Cooldown ticker effect (persistent across refresh via localStorage stored timestamp per key)
+  useEffect(()=>{
+    if (!cooldownActiveKey) return
+    let raf: number | null = null
+    let lastFrame: number | null = null
+    const tick = (ts:number) => {
+      if (lastFrame==null) lastFrame = ts
+      const elapsed = ts - lastFrame
+      lastFrame = ts
+      setCooldownRemaining(prev=> {
+        const next = Math.max(0, prev - elapsed)
+        if (next === 0) {
+          // Clean up expired key in storage (optional; keep history limited)
+          try {
+            const raw = localStorage.getItem('price_check_cooldowns')
+            if (raw) {
+              const map = JSON.parse(raw)
+              delete map[cooldownActiveKey]
+              localStorage.setItem('price_check_cooldowns', JSON.stringify(map))
+            }
+          } catch {}
+        }
+        return next
+      })
+      if (cooldownRemaining > 0) raf = requestAnimationFrame(tick)
+    }
+    if (cooldownRemaining > 0) raf = requestAnimationFrame(tick)
+    return ()=> { if (raf) cancelAnimationFrame(raf) }
+  }, [cooldownActiveKey])
+
+  // Restore active cooldown on mount (page refresh) so timer persists
+  useEffect(()=>{
+    try {
+      const raw = localStorage.getItem('price_check_cooldowns')
+      const active = localStorage.getItem('price_check_active_key')
+      if (raw && active) {
+        const map = JSON.parse(raw)
+        const ts = map[active]
+        if (typeof ts === 'number') {
+          const elapsed = Date.now() - ts
+            if (elapsed < COOLDOWN_MS) {
+              setCooldownActiveKey(active)
+              setCooldownRemaining(COOLDOWN_MS - elapsed)
+            } else {
+              // Cleanup expired
+              delete map[active]
+              localStorage.setItem('price_check_cooldowns', JSON.stringify(map))
+              localStorage.removeItem('price_check_active_key')
+            }
+        }
+      }
+    } catch {}
+  }, [])
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -1049,7 +1140,53 @@ export function ItemPriceChecker() {
           <button className={mode==='simple'? 'active':''} onClick={()=>persistMode('simple')}>Simple Name</button>
         </div>
         <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
-          {/* Removed league pill per user request */}
+          {/* Cooldown progress (replaces removed league pill) */}
+          {cooldownRemaining > 0 && (
+            <div style={{display:'flex',flexDirection:'column',gap:4,minWidth:180,position:'relative'}}>
+              <div style={{position:'relative',height:6,background:'#2a2a2a',borderRadius:6,overflow:'hidden',boxShadow:'0 0 0 1px #000,inset 0 0 4px rgba(0,0,0,.6)'}} aria-label="Item price check cooldown" role="progressbar" aria-valuemin={0} aria-valuemax={COOLDOWN_MS/1000} aria-valuenow={Math.ceil(cooldownRemaining/1000)}>
+                <div style={{position:'absolute',inset:0,background:'linear-gradient(90deg,#b47a2d,#7d531f)',transform:`translateX(-${100 - (cooldownRemaining/COOLDOWN_MS*100)}%)`,transition:'transform 1s linear'}} />
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:11,letterSpacing:.5,color:'#d6d6d6',alignItems:'center'}}>
+                <span style={{opacity:.7,display:'inline-flex',alignItems:'center',gap:4}}>
+                  Cooldown
+                  <span
+                    role="img"
+                    aria-label={COOLDOWN_TOOLTIP}
+                    title={COOLDOWN_TOOLTIP}
+                    style={{
+                      display:'inline-flex',
+                      width:18,
+                      height:18,
+                      cursor:'help',
+                      alignItems:'center',
+                      justifyContent:'center',
+                      borderRadius:'50%',
+                      background:'linear-gradient(145deg,#262626,#1b1b1b)',
+                      boxShadow:'0 0 0 1px #3f2d16, 0 0 4px rgba(0,0,0,.7), inset 0 0 4px rgba(255,180,80,0.15)',
+                      position:'relative',
+                      transition:'box-shadow .2s, transform .2s'
+                    }}
+                    onMouseEnter={e=>{ (e.currentTarget as HTMLElement).style.boxShadow='0 0 0 1px #b47a2d, 0 0 6px 2px rgba(180,122,45,.55), inset 0 0 6px rgba(255,200,120,.25)' }}
+                    onMouseLeave={e=>{ (e.currentTarget as HTMLElement).style.boxShadow='0 0 0 1px #3f2d16, 0 0 4px rgba(0,0,0,.7), inset 0 0 4px rgba(255,180,80,0.15)' }}
+                  >
+                    <svg width={16} height={16} viewBox="0 0 24 24" aria-hidden="true" style={{filter:'drop-shadow(0 0 3px rgba(180,122,45,.55))'}}>
+                      <defs>
+                        <radialGradient id="cooldownInfoGold" cx="30%" cy="30%" r="70%">
+                          <stop offset="0%" stopColor="#ffe3b0" />
+                          <stop offset="55%" stopColor="#d5a04e" />
+                          <stop offset="100%" stopColor="#7d531f" />
+                        </radialGradient>
+                      </defs>
+                      <circle cx="12" cy="12" r="10" fill="url(#cooldownInfoGold)" stroke="#b47a2d" strokeWidth="1.2" />
+                      <path d="M12 10.4v6.2" stroke="#1a1205" strokeWidth="2" strokeLinecap="round" />
+                      <circle cx="12" cy="7.4" r="1.25" fill="#1a1205" />
+                    </svg>
+                  </span>
+                </span>
+                <strong>{Math.ceil(cooldownRemaining/1000)}s</strong>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1085,9 +1222,37 @@ export function ItemPriceChecker() {
                       <div
                         onMouseEnter={()=>setShowModHelp(true)}
                         onMouseLeave={()=>setShowModHelp(false)}
-                        style={{marginLeft:'auto',cursor:'help',width:16,height:16,borderRadius:8,background:'#1e1e1e',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#7fb8ff',border:'1px solid #2f2f2f'}}
                         aria-label="Explain modifiers"
-                      >i</div>
+                        title="Explain modifiers"
+                        style={{
+                          marginLeft:'auto',
+                          cursor:'help',
+                          width:18,
+                          height:18,
+                          borderRadius:9,
+                          display:'flex',
+                          alignItems:'center',
+                          justifyContent:'center',
+                          background:'linear-gradient(145deg,#262626,#1b1b1b)',
+                          boxShadow:'0 0 0 1px #3f2d16, 0 0 4px rgba(0,0,0,.7), inset 0 0 4px rgba(255,180,80,0.15)',
+                          transition:'box-shadow .2s'
+                        }}
+                        onMouseOver={e=>{ (e.currentTarget as HTMLElement).style.boxShadow='0 0 0 1px #b47a2d, 0 0 6px 2px rgba(180,122,45,.55), inset 0 0 6px rgba(255,200,120,.25)' }}
+                        onMouseOut={e=>{ (e.currentTarget as HTMLElement).style.boxShadow='0 0 0 1px #3f2d16, 0 0 4px rgba(0,0,0,.7), inset 0 0 4px rgba(255,180,80,0.15)' }}
+                      >
+                        <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true" style={{filter:'drop-shadow(0 0 2px rgba(180,122,45,.5))'}}>
+                          <defs>
+                            <radialGradient id="modHelpGold" cx="30%" cy="30%" r="70%">
+                              <stop offset="0%" stopColor="#ffe3b0" />
+                              <stop offset="55%" stopColor="#d5a04e" />
+                              <stop offset="100%" stopColor="#7d531f" />
+                            </radialGradient>
+                          </defs>
+                          <circle cx="12" cy="12" r="10" fill="url(#modHelpGold)" stroke="#b47a2d" strokeWidth="1.2" />
+                          <path d="M12 10.4v6.2" stroke="#1a1205" strokeWidth="2" strokeLinecap="round" />
+                          <circle cx="12" cy="7.4" r="1.25" fill="#1a1205" />
+                        </svg>
+                      </div>
                       {showModHelp && (
                         <div style={{position:'absolute',top:30,right:8,zIndex:10,background:'#161616',border:'1px solid #2d2d2d',borderRadius:8,padding:'10px 12px',width:300,lineHeight:1.4,boxShadow:'0 4px 18px rgba(0,0,0,.6)'}}>
                           <div style={{fontSize:11,color:'#d8d8d8'}}>
