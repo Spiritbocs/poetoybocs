@@ -5,9 +5,10 @@ import { useState, useEffect } from 'react'
 interface SessionManagerProps {
   onSessionReady: (sessionId: string) => void
   isTradeEnabled: boolean
+  league: string
 }
 
-export function SessionManager({ onSessionReady, isTradeEnabled }: SessionManagerProps) {
+export function SessionManager({ onSessionReady, isTradeEnabled, league }: SessionManagerProps) {
   const [sessionId, setSessionId] = useState<string>('')
   const [isValidating, setIsValidating] = useState(false)
   const [validationResult, setValidationResult] = useState<{
@@ -31,7 +32,7 @@ export function SessionManager({ onSessionReady, isTradeEnabled }: SessionManage
       const res = await fetch('/api/session/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: id })
+        body: JSON.stringify({ sessionId: id, league })
       })
       
       const result = await res.json()

@@ -32,7 +32,7 @@ export default function HomePage() {
       {/* Session Manager - shows when trade features are not ready */}
       {!sessionReady && (
         <div style={{ marginBottom: '2rem' }}>
-          <SessionManager onSessionReady={handleSessionReady} isTradeEnabled={sessionReady} />
+          <SessionManager onSessionReady={handleSessionReady} isTradeEnabled={sessionReady} league={league} />
         </div>
       )}
 

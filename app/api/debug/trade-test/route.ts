@@ -4,7 +4,7 @@ export async function GET() {
   try {
     // Test the trade search with a simple query
     const testBody = {
-      league: "Settlers",
+      league: "Mercenaries", // Current league - should ideally be dynamic
       query: {
         status: { option: "online" },
         stats: [{
