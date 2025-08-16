@@ -2,15 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { poeApi, type League } from '@/lib/poe-api'
+import { useLeague } from './league-context'
 
-interface TopNavProps {
-  realm: 'pc'|'xbox'|'sony'
-  league: string
-  onRealmChange: (r: 'pc'|'xbox'|'sony') => void
-  onLeagueChange: (l: string) => void
-}
-
-export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavProps) {
+export function TopNav() {
+  const { league, realm, setLeague, setRealm } = useLeague()
   const [isAuth, setIsAuth] = useState(false)
   const [accountName, setAccountName] = useState<string | null>(null)
   const [leagues, setLeagues] = useState<League[]>([])
@@ -45,9 +40,13 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
         const data = await poeApi.getLeagues(realm)
         if (cancelled) return
         setLeagues(data)
-        if (!league) {
-          const current = data.find(l=>l.category?.current) || data[0]
-          if (current) onLeagueChange(current.id)
+        // If current league is Ruthless and Mercenaries exists, auto switch
+        if (/ruthless/i.test(league)) {
+          const merc = data.find(l=> /^Mercenaries$/i.test(l.id))
+          if (merc) setLeague(merc.id)
+        } else if (!league) {
+          const current = data.find(l=> /^Mercenaries$/i.test(l.id)) || data.find(l=>l.category?.current) || data[0]
+          if (current) setLeague(current.id)
         }
       } finally {
         if (!cancelled) setLoadingLeagues(false)
@@ -117,8 +116,10 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
     <nav className="top-nav" style={{position:'sticky',top:0,zIndex:50,background:'linear-gradient(90deg,#121212,#181818 40%,#1d1a14 95%)',borderBottom:'1px solid #2a2a2a',padding:'8px 16px',display:'flex',alignItems:'center',gap:16,backdropFilter:'blur(6px)'}}>
       {/* Brand stays left */}
       <div style={{fontWeight:700,fontSize:'1rem',letterSpacing:'.5px',display:'flex',alignItems:'center',gap:6}}>
-        <span style={{color:'var(--poe-gold, #c8aa6e)'}}>Spiritbocs</span>
-        <span style={{opacity:.65}}>Tracker</span>
+        <a href="/" style={{display:'flex',alignItems:'center',gap:6,textDecoration:'none'}}>
+          <span style={{color:'var(--poe-gold, #c8aa6e)'}}>Spiritbocs</span>
+          <span style={{opacity:.65}}>Tracker</span>
+        </a>
       </div>
       <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:18}}>
         {/* Timers */}
@@ -132,12 +133,12 @@ export function TopNav({ realm, league, onRealmChange, onLeagueChange }: TopNavP
         </div>
         {/* Selectors */}
         <div style={{display:'flex',alignItems:'center',gap:12}}>
-          <select aria-label="Realm" value={realm} onChange={e=>onRealmChange(e.target.value as any)} style={selectStyle}>
+          <select aria-label="Realm" value={realm} onChange={e=>setRealm(e.target.value as any)} style={selectStyle}>
             <option value="pc">PC</option>
             <option value="xbox">Xbox</option>
             <option value="sony">PlayStation</option>
           </select>
-          <select aria-label="League" value={league} onChange={e=>onLeagueChange(e.target.value)} style={selectStyle} disabled={loadingLeagues || leagues.length===0}>
+          <select aria-label="League" value={league} onChange={e=>setLeague(e.target.value)} style={selectStyle} disabled={loadingLeagues || leagues.length===0}>
             {loadingLeagues && <option>Loading...</option>}
             {!loadingLeagues && leagues.map(l=> <option key={l.id} value={l.id}>{l.id}{l.category?.current ? ' *':''}</option>)}
           </select>

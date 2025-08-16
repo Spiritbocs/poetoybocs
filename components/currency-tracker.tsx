@@ -307,10 +307,7 @@ export function CurrencyTracker({ league, realm = 'pc', initialType }: CurrencyT
             <img src={chaosIcon} alt="Chaos" />
           </div>
         )}
-        <div className="segmented">
-          <button className={type === 'Currency' ? 'active' : ''} onClick={()=>{ setType('Currency'); localStorage.setItem('global_currency_type','Currency') }}>Currency</button>
-          <button className={type === 'Fragment' ? 'active' : ''} onClick={()=>{ setType('Fragment'); localStorage.setItem('global_currency_type','Fragment') }}>Fragments</button>
-        </div>
+  {/* Removed manual Currency/Fragments toggle (sidebar drives type via initialType) */}
         <div className="segmented">
           <button className={mode === 'buy' ? 'active' : ''} onClick={()=>{ setMode('buy'); localStorage.setItem('global_trade_mode','buy') }}>Buy</button>
           <button className={mode === 'sell' ? 'active' : ''} onClick={()=>{ setMode('sell'); localStorage.setItem('global_trade_mode','sell') }}>Sell</button>

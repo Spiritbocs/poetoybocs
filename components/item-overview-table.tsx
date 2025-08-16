@@ -14,6 +14,8 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(()=> (typeof window!=='undefined' ? (localStorage.getItem(`global_search_${type}`) || '') : ''))
   const [mode, setMode] = useState<'buy'|'sell'>(()=> (typeof window!=='undefined' && (localStorage.getItem('global_trade_mode') as any)) || 'buy')
+  const [showLowConfidence, setShowLowConfidence] = useState(()=> (typeof window!=='undefined' ? localStorage.getItem('global_show_low_conf_items') === '1' : false))
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null)
   // Removed router usage since detail pages deleted.
   const [tooltip, setTooltip] = useState<{ x:number; y:number; row:any; spark:number[]; change7d:number; change24h:number } | null>(null)
 
@@ -21,9 +23,10 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
     let cancelled = false
     async function run() {
       setLoading(true)
-  const lines = await poeApi.getItemOverview(league, type, realm)
+	  const lines = await poeApi.getItemOverview(league, type, realm)
       if (!cancelled) {
         setData(lines)
+        setLastUpdated(Date.now())
         setLoading(false)
       }
     }
@@ -32,7 +35,14 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
   }, [league, type, realm])
 
   useEffect(()=>{ try { localStorage.setItem(`global_search_${type}`, search) } catch {} }, [search, type])
-  const filtered = data.filter(l => !search || (l.name || l.baseType || l.currencyTypeName || '').toLowerCase().includes(search.toLowerCase()))
+  const filtered = data.filter(l => {
+    if (search && !(l.name || l.baseType || l.currencyTypeName || '').toLowerCase().includes(search.toLowerCase())) return false
+    if (!showLowConfidence) {
+      const pts = (l.sparkline?.data || []).filter((n:number)=> n!==0).length
+      if (pts < 3) return false
+    }
+    return true
+  })
   // Capture chaos / divine icons & ratio for price chain
   const chaosEntry = filtered.find(l => (l.currencyTypeName === 'Chaos Orb' || l.name === 'Chaos Orb'))
   const divineEntry = filtered.find(l => (l.currencyTypeName === 'Divine Orb' || l.name === 'Divine Orb'))
@@ -109,6 +119,20 @@ export function ItemOverviewTable({ league, realm='pc', type, title }: ItemOverv
         <div className="segmented">
           <button className={mode==='buy'? 'active':''} onClick={()=>{ setMode('buy'); localStorage.setItem('global_trade_mode','buy') }}>Buy</button>
           <button className={mode==='sell'? 'active':''} onClick={()=>{ setMode('sell'); localStorage.setItem('global_trade_mode','sell') }}>Sell</button>
+        </div>
+        {lastUpdated && (
+          <div style={{fontSize:11,opacity:.65}}>Updated {new Date(lastUpdated).toLocaleTimeString()}</div>
+        )}
+        <div className="toggle-wrapper low-conf-toggle">
+          <label className="toggle-label">
+            <span className="label-text">Show low confidence <span className="info-icon" aria-label="Info" tabIndex={0}>i</span>
+              <span className="tooltip" role="tooltip">Entries with very sparse sparkline data (&lt;3 non-zero points) are hidden unless enabled.</span>
+            </span>
+            <div className="toggle">
+              <input type="checkbox" checked={showLowConfidence} onChange={e=>{ setShowLowConfidence(e.target.checked); try { e.target.checked ? localStorage.setItem('global_show_low_conf_items','1') : localStorage.removeItem('global_show_low_conf_items') } catch {} }} />
+              <div className="toggle-track"><div className="toggle-thumb" /></div>
+            </div>
+          </label>
         </div>
       </div>
       {/* Unified header style (match Currency tracker visual) */}

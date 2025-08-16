@@ -178,6 +178,16 @@ interface CharacterSummary {
 }
 export type { CharacterSummary }
 
+// Simple global rate limiter state for trade endpoints
+let tradeLastSearchAt = 0
+let tradeLastFetchAt = 0
+let tradeMinSearchInterval = 350 // ms between /search calls (adaptive)
+let tradeMinFetchInterval = 250  // ms between /fetch calls (adaptive)
+let globalRateLimitUntil = 0     // epoch ms until which we should not hit upstream
+let lastRateLimitSeconds = 0
+
+function sleep(ms:number) { return new Promise(res=> setTimeout(res, ms)) }
+
 class PoEAPI {
   private baseUrl = "https://api.pathofexile.com"
   private tradeUrl = "https://www.pathofexile.com/api/trade"
@@ -645,6 +655,25 @@ private oauthConfig: OAuthConfig = {
   }
 
   async searchItems(league: string, query: any): Promise<TradeSearchResult> {
+    // If global cooldown active, wait (short-circuit) so we don't spam upstream
+    if (Date.now() < globalRateLimitUntil) {
+      const waitMs = globalRateLimitUntil - Date.now()
+      await sleep(Math.min(waitMs, 1000)) // brief wait; UI can still show loading
+      if (Date.now() < globalRateLimitUntil) {
+        // Still rate limited – throw a tagged error so UI can communicate cooldown
+        const remaining = Math.ceil((globalRateLimitUntil - Date.now())/1000)
+        throw new Error(`rate_limited:${remaining}`)
+      }
+    }
+    // Enforce client throttle between searches
+    const since = Date.now() - tradeLastSearchAt
+    if (since < tradeMinSearchInterval) {
+      await sleep(tradeMinSearchInterval - since)
+    }
+    // Respect feature flag: if proxy disabled, fail fast so UI can use fallback
+    if (typeof process !== 'undefined' && process.env.USE_TRADE_PROXY === 'false') {
+      throw new Error('trade_proxy_disabled')
+    }
     // Use internal proxy to avoid CORS & reduce payload
     try {
       const res = await fetch('/api/trade/search', {
@@ -652,9 +681,48 @@ private oauthConfig: OAuthConfig = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ league, query })
       })
-      if (!res.ok) throw new Error(`proxy_http_${res.status}`)
-      const json = await res.json()
-      return json
+
+      // Capture response body for diagnostics whether ok or not
+      let text: string | null = null
+      try { text = await res.text() } catch (e) { text = null }
+      let parsed: any = null
+      if (text) {
+        try { parsed = JSON.parse(text) } catch { parsed = null }
+      }
+
+      if (!res.ok) {
+        const bodySnippet = text ? (text.length > 2000 ? text.slice(0,2000) + '... [truncated]' : text) : ''
+        const info = parsed ? JSON.stringify(parsed) : bodySnippet
+        // Detect upstream rate limit (sometimes wrapped by proxy as 502 containing upstream 429)
+        let rateLimitedSeconds: number | null = null
+        if (text && /Rate limit exceeded; Please wait (\d+) seconds/i.test(text)) {
+          const m = text.match(/Rate limit exceeded; Please wait (\d+) seconds/i)
+          if (m) {
+            rateLimitedSeconds = parseInt(m[1]!,10)
+            lastRateLimitSeconds = rateLimitedSeconds
+            globalRateLimitUntil = Date.now() + (rateLimitedSeconds*1000) + 500
+            // Adaptive backoff: widen client throttle modestly while cooldown active
+            tradeMinSearchInterval = Math.min(1200, 350 + rateLimitedSeconds*25)
+            tradeMinFetchInterval = Math.min(900, 250 + rateLimitedSeconds*20)
+          }
+        }
+        const err = new Error(rateLimitedSeconds !== null ? `rate_limited:${rateLimitedSeconds}` : `proxy_http_${res.status} ${info}`)
+        const debug = (typeof process !== 'undefined') ? process.env.NEXT_PUBLIC_DEBUG_TRADE === 'true' : false
+        if (debug) {
+          console.error('Trade search proxy non-ok:', res.status, res.statusText, bodySnippet)
+        } else {
+          // Downgrade to warn in production to reduce console noise while still surfacing status.
+          console.warn('Trade search proxy non-ok:', res.status, res.statusText)
+        }
+        // If rate limited we already transformed the error; just throw
+        throw err
+      }
+
+      // If OK, return parsed JSON (or raw text parsed)
+      if (parsed) return parsed
+      const okJson = await res.json()
+      tradeLastSearchAt = Date.now()
+      return okJson
     } catch (e) {
       console.error('Trade search proxy failed', e)
       throw e
@@ -663,15 +731,54 @@ private oauthConfig: OAuthConfig = {
 
   async getItemDetails(searchId: string, itemIds: string[]): Promise<TradeItem[]> {
     try {
-      const ids = itemIds.slice(0, 20)
-      const res = await fetch('/api/trade/fetch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids, query: searchId })
-      })
-      if (!res.ok) throw new Error(`proxy_http_${res.status}`)
-      const json = await res.json()
-      return Array.isArray(json.result) ? json.result : []
+      if (typeof process !== 'undefined' && process.env.USE_TRADE_PROXY === 'false') {
+        throw new Error('trade_proxy_disabled')
+      }
+      // Respect global cooldown
+      if (Date.now() < globalRateLimitUntil) {
+        const remaining = globalRateLimitUntil - Date.now()
+        if (remaining > 1200) {
+          // Don't block UI for long periods – return empty so caller can surface message
+          return []
+        }
+        await sleep(remaining)
+      }
+      // Validate inputs before calling proxy
+      if (typeof searchId !== 'string' || !searchId.trim()) throw new Error('invalid_search_id')
+      if (!Array.isArray(itemIds) || itemIds.length === 0) throw new Error('invalid_item_ids')
+      const batches: TradeItem[][] = []
+      for (let i=0;i<itemIds.length;i+=10) {
+        const ids = itemIds.slice(i,i+10)
+        // Client-side throttle per batch
+        const since = Date.now() - tradeLastFetchAt
+        if (since < tradeMinFetchInterval) {
+          await sleep(tradeMinFetchInterval - since)
+        }
+        const res = await fetch('/api/trade/fetch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids, query: String(searchId) })
+        })
+        let text: string | null = null
+        try { text = await res.text() } catch { text = null }
+        let parsed: any = null
+        if (text) { try { parsed = JSON.parse(text) } catch { parsed = null } }
+        if (!res.ok) {
+          // If invalid query (400) stop further fetches to avoid spam; return what we have
+            if (res.status === 400) {
+              console.warn('Fetch batch returned 400 invalid query; halting remaining batches.')
+              break
+            }
+          if (text && /Rate limit exceeded; Please wait (\d+) seconds/i.test(text)) {
+            const m = text.match(/Rate limit exceeded; Please wait (\d+) seconds/i); if (m) { lastRateLimitSeconds = parseInt(m[1]!,10); globalRateLimitUntil = Date.now() + (lastRateLimitSeconds*1000)+500 }
+          }
+          continue
+        }
+        const json = parsed || await res.json()
+        tradeLastFetchAt = Date.now()
+        if (Array.isArray(json.result)) batches.push(json.result)
+      }
+      return batches.flat()
     } catch (e) {
       console.error('Trade fetch proxy failed', e)
       return []
@@ -752,15 +859,70 @@ private oauthConfig: OAuthConfig = {
   }
 
   /**
-   * Compute a simple average chaos price from trade items (assumes same currency)
+   * Compute a simple average chaos price from trade items.
+   * If listings are in mixed currencies, convert to chaos using poe.ninja rates.
    */
-  averageListingPrice(items: TradeItem[]): { average: number; currency: string } | null {
+  async averageListingPrice(items: TradeItem[], league: string = 'Mercenaries'): Promise<{ average: number; currency: string } | null> {
     const priced = items.filter(i=> i.listing.price && typeof i.listing.price.amount==='number')
     if (!priced.length) return null
-    const currency = priced[0].listing.price!.currency
-    const avg = priced.reduce((sum,i)=> sum + (i.listing.price!.amount||0),0) / priced.length
-    return { average: avg, currency }
+    // Determine currency distribution
+    const currencyBuckets: Record<string, number[]> = {}
+    priced.forEach(i=>{
+      const cur = String(i.listing.price!.currency || 'chaos')
+      if (!currencyBuckets[cur]) currencyBuckets[cur] = []
+      currencyBuckets[cur].push(i.listing.price!.amount || 0)
+    })
+    // If everything is chaos, simple average
+    const currencies = Object.keys(currencyBuckets)
+    if (currencies.length === 1 && currencies[0].toLowerCase().includes('chaos')) {
+      const all = currencyBuckets[currencies[0]]
+      const avg = all.reduce((a,b)=>a+b,0)/all.length
+      return { average: avg, currency: currencies[0] }
+    }
+    // Otherwise fetch currency rates and convert to chaos equivalent
+    // Use getCurrencyData to obtain chaosEquivalent for common currency names
+    let rates: Record<string, number> = {}
+    try {
+      // Attempt to get chaos equivalents for known currency types in current league
+      const data = await this.getCurrencyData(league)
+      data.forEach(d=>{ if (d.currencyTypeName && typeof d.chaosEquivalent==='number') rates[d.currencyTypeName.toLowerCase()] = d.chaosEquivalent })
+    } catch (e) {
+      // ignore rate fetch failures; fallback to using raw amounts (lossy)
+    }
+    // Normalize currency keys (common synonyms)
+    const normalize = (s:string) => s.toLowerCase().replace(/[^a-z]/g,'')
+    const synonyms: Record<string,string> = {
+      'chaosorb':'chaos', 'chaos':'chaos', 'c':'chaos',
+      'divineorb':'divine','divine':'divine','exa':'divine'
+    }
+    // Convert all amounts into chaos where possible
+    const converted: number[] = []
+    for (const cur of currencies) {
+      const amounts = currencyBuckets[cur]
+      const key = normalize(cur)
+      const mapped = synonyms[key] || key
+      const rate = rates[mapped] || (mapped==='chaos' ? 1 : undefined)
+      if (rate) {
+        amounts.forEach(a=> converted.push(a * rate))
+      } else {
+        // Unknown currency — skip or push raw (as fallback we push raw)
+        amounts.forEach(a=> converted.push(a))
+      }
+    }
+    if (!converted.length) return null
+    // Trim 10% both sides for robustness if enough samples
+    const sorted = converted.sort((a,b)=>a-b)
+    let use = sorted
+    if (sorted.length >= 10) {
+      const cut = Math.floor(sorted.length * 0.1)
+      use = sorted.slice(cut, sorted.length - cut)
+    }
+    const avg = use.reduce((a,b)=>a+b,0)/use.length
+    return { average: avg, currency: 'chaos' }
   }
 }
 
 export const poeApi = new PoEAPI()
+// Expose helper for UI to obtain remaining cooldown time (ms)
+;(poeApi as any).getRateLimitRemaining = () => Math.max(0, globalRateLimitUntil - Date.now())
+;(poeApi as any).getLastRateLimitSeconds = () => lastRateLimitSeconds

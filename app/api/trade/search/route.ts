@@ -10,6 +10,10 @@ export async function POST(req: Request) {
     if (!body || !body.league || !body.query) {
       return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
     }
+    // Respect server-side feature flag to disable calling the PoE trade API
+    if (process.env.USE_TRADE_PROXY === 'false') {
+      return NextResponse.json({ error: 'trade_proxy_disabled', message: 'Trade proxy is disabled by server configuration' }, { status: 503 })
+    }
     const { league, query } = body
     const upstream = `https://www.pathofexile.com/api/trade/search/${encodeURIComponent(league)}`
     const res = await fetch(upstream, {

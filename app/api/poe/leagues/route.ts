@@ -13,15 +13,17 @@ export async function GET(req: Request) {
   if (cached && now - cached.ts < TTL) {
     return NextResponse.json(cached.data, { headers: corsHeaders() })
   }
-  // Official docs: /league returns leagues; omit type to retrieve broader set (main + historical/event where available)
-  const base = `https://api.pathofexile.com/league?realm=${encodeURIComponent(realm)}`
+  // Official endpoint is /leagues (plural). Use plural; keep singular fallback for legacy just in case.
+  const basePlural = `https://api.pathofexile.com/leagues?realm=${encodeURIComponent(realm)}`
+  const baseSingular = `https://api.pathofexile.com/league?realm=${encodeURIComponent(realm)}`
+  let base = basePlural
   const all: any[] = []
   let offset = 0
   const pageLimit = 50
   // Paginate defensively (max 4 pages) even though main normally caps at 50
   while (offset < 200) {
     const url = `${base}&limit=${pageLimit}&offset=${offset}`
-    const res = await fetch(url, {
+    let res = await fetch(url, {
       headers: {
         'User-Agent': 'poetoybocs/1.0 (+https://poetoybocs.vercel.app)',
         'Accept': 'application/json'
@@ -29,7 +31,22 @@ export async function GET(req: Request) {
       cache: 'no-store'
     })
     if (!res.ok) {
-      return NextResponse.json({ error: `upstream ${res.status}` }, { status: res.status, headers: corsHeaders() })
+      // If 404/401 perhaps endpoint variant mismatch; attempt singular once then abort
+      if ((res.status === 404 || res.status === 401) && base === basePlural) {
+        base = baseSingular
+        // retry this page immediately with singular endpoint
+        const retryUrl = `${base}&limit=${pageLimit}&offset=${offset}`
+        res = await fetch(retryUrl, {
+          headers: {
+            'User-Agent': 'poetoybocs/1.0 (+https://poetoybocs.vercel.app)',
+            'Accept': 'application/json'
+          },
+          cache: 'no-store'
+        })
+      }
+      if (!res.ok) {
+        return NextResponse.json({ error: `upstream ${res.status}` }, { status: res.status, headers: corsHeaders() })
+      }
     }
     const data = await res.json()
     if (Array.isArray(data)) all.push(...data)

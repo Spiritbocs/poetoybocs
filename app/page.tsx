@@ -6,21 +6,17 @@ import { CurrencyTracker } from "@/components/currency-tracker"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { ItemOverviewTable } from "@/components/item-overview-table"
 import { ItemPriceChecker } from "@/components/item-price-checker"
+import { useLeague } from "@/components/league-context"
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"currency" | "items">("currency")
-  const [realm, setRealm] = useState<'pc'|'xbox'|'sony'>('pc')
-  const [league, setLeague] = useState<string>('')
+  // Consume shared league/realm from context (TopNav now manages selection)
+  const { league, realm } = useLeague()
   const [activeSection, setActiveSection] = useState<{ key: string; label: string; type?: "Currency" | "Fragment" }>({ key: 'currency', label: 'Currency', type: 'Currency' })
 
   return (
     <>
-      <TopNav
-        realm={realm}
-        league={league}
-        onRealmChange={(r)=> setRealm(r)}
-        onLeagueChange={(l)=> setLeague(l)}
-      />
+  <TopNav />
     <div className="container" style={{paddingTop:'16px'}}>
   {/* Header removed per request; content condenses upward */}
 

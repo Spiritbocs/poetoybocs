@@ -15,11 +15,14 @@ export function LeagueSelector({ onLeagueChange, onRealmChange }: LeagueSelector
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Restore persisted selection
+    // Restore persisted selection; if none or a Ruthless variant found, prefer Mercenaries as default challenge league
     if (typeof window !== 'undefined') {
       const savedRealm = localStorage.getItem('poe_realm') as any
-      const savedLeague = localStorage.getItem('poe_league')
+      let savedLeague = localStorage.getItem('poe_league') || ''
       if (savedRealm && ['pc','xbox','sony'].includes(savedRealm)) setRealm(savedRealm)
+      if (!savedLeague || /ruthless/i.test(savedLeague)) {
+        savedLeague = 'Mercenaries'
+      }
       if (savedLeague) setSelectedLeague({ id: savedLeague, description: undefined, category: undefined })
     }
   }, [])
@@ -42,7 +45,8 @@ export function LeagueSelector({ onLeagueChange, onRealmChange }: LeagueSelector
           chosen = leagueData.find(l=>l.id === selectedLeague.id)
         }
         if (!chosen) {
-          chosen = leagueData.find(l=>l.category?.current) || leagueData[0]
+          // Prefer Mercenaries if present
+          chosen = leagueData.find(l=> /^Mercenaries$/i.test(l.id)) || leagueData.find(l=>l.category?.current) || leagueData[0]
         }
         if (chosen) { setSelectedLeague(chosen); onLeagueChange?.(chosen) }
       } catch (error) {

@@ -1,10 +1,11 @@
-  "use client"
+"use client"
 
-  import type React from "react"
+import React from "react"
 
-  import { useState, useEffect } from "react"
-  import { poeApi, type TradeItem } from "@/lib/poe-api"
-  
+import { useState, useEffect } from "react"
+import { poeApi, type TradeItem } from "@/lib/poe-api"
+import { useLeague } from "./league-context"
+
 export function ItemPriceChecker() {
   // Simple name search (legacy fallback)
   const [searchTerm, setSearchTerm] = useState("")
@@ -14,34 +15,214 @@ export function ItemPriceChecker() {
   const [mode, setMode] = useState<'simple'|'clipboard'>(()=> (typeof window!=="undefined" ? (localStorage.getItem('price_checker_mode') as any)||'clipboard':'clipboard'))
   const [searchResults, setSearchResults] = useState<TradeItem[]>([])
   const [loading, setLoading] = useState(false)
-  const [selectedLeague, setSelectedLeague] = useState("Mercenaries")
-  const [priceSummary, setPriceSummary] = useState<{min:number; max:number; median:number; average:number; trimmedAverage:number; suggested:number; count:number; confidence:number} | null>(null)
+  const { league: selectedLeague } = useLeague()
+  const [priceSummary, setPriceSummary] = useState<{
+    min:number; max:number; median:number; average:number; trimmedAverage:number;
+    suggestedChaos:number; // suggested in chaos (base before currency auto-display)
+    suggested:{ amount:number; currency:'chaos'|'div' };
+    quickSell:{ amount:number; currency:'chaos'|'div' };
+    fairPrice:{ amount:number; currency:'chaos'|'div' };
+  quickSellChaos?:number; fairPriceChaos?:number;
+  count:number; confidence:number; originalCount:number; removed:number; divRate:number|null;
+  } | null>(null)
+  const [showExplain,setShowExplain] = useState(false)
+  const [exactPrice, setExactPrice] = useState<{ average: number; currency: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tradeSearchId, setTradeSearchId] = useState<string | null>(null)
+  // Quick filter state (mirrors the overlay)
+  const [rarityFilter, setRarityFilter] = useState<string>('any')
+  const [currencyFilter, setCurrencyFilter] = useState<string>('chaos')
+  const [onlineOnly, setOnlineOnly] = useState<boolean>(true)
+  const [timeFilter, setTimeFilter] = useState<string>('any')
+  const [ilvlMin, setIlvlMin] = useState<string>('')
+  const [ilvlMax, setIlvlMax] = useState<string>('')
+  const [qualityMin, setQualityMin] = useState<string>('')
+  const [qualityMax, setQualityMax] = useState<string>('')
+  const [linksMin, setLinksMin] = useState<string>('')
   const [poePriceResult, setPoePriceResult] = useState<{min: number; max: number; currency: string; confidence: number} | null>(null)
   const [poePriceLoading, setPoePriceLoading] = useState(false)
+  const [poePriceNote, setPoePriceNote] = useState<string | null>(null)
   const [lastQuery, setLastQuery] = useState<any | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
+  const [hideCrafted, setHideCrafted] = useState(true)
+  const [pseudoMods, setPseudoMods] = useState<Array<{ id:string; text:string; value:number }>>([])
+  const [filtersDirty, setFiltersDirty] = useState(false)
+  // Track whether a search was executed so we don't show empty placeholder rows
+  const [searchPerformed, setSearchPerformed] = useState(false)
+  const [lastSuccessfulResults, setLastSuccessfulResults] = useState<TradeItem[]>([])
+  const [noFilterMatch, setNoFilterMatch] = useState(false)
+  // Indicates when we automatically stripped pseudo.* filters to recover from empty/invalid query
+  const [autoStrippedPseudos, setAutoStrippedPseudos] = useState<null | { reason:string }>(null)
+  const [approximateResults, setApproximateResults] = useState(false)
+  const [showModHelp, setShowModHelp] = useState(false)
+  // Display mode for prices: chaos only, auto chaos/divine, or chaos equivalent with both
+  const [priceDisplayMode, setPriceDisplayMode] = useState<'chaos'|'auto'|'equiv'>('auto')
+
+  // Per-stat quick filter state (initialized from parsed item lines)
+  const [statFilters, setStatFilters] = useState<Record<string,{ enabled: boolean; min: string; max: string; quality: string; text?: string; source?: string }>>({})
+
+  // Button styles to match top-nav (pills) for consistent UI
+  const btnStyle: React.CSSProperties = {
+    background:'linear-gradient(#2b2b2b,#1f1f1f)',
+    color:'#d8d8d8',
+    border:'1px solid #3b3b3b',
+    padding:'4px 10px',
+    borderRadius:14,
+    fontSize:12,
+    cursor:'pointer',
+    boxShadow:'0 1px 2px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.04)',
+    transition:'background .15s, color .15s, transform .15s'
+  }
+  const btnStylePrimary: React.CSSProperties = {
+    ...btnStyle,
+    background:'linear-gradient(90deg,#7d531f,#b47a2d)',
+    border:'1px solid #b58235',
+    color:'#ffe7b8',
+    padding:'6px 12px'
+  }
 
   const persistMode = (m:'simple'|'clipboard')=>{ setMode(m); try{ localStorage.setItem('price_checker_mode',m)}catch{} }
 
+  // Convert a raw mod line into PoE-style placeholder form (numbers -> #, keep +/- and % and ranges)
+  const normalizeModLine = (line:string):string => {
+    return line
+      .replace(/\s*\(implicit\)/ig,'')
+      .replace(/([+-]?)(\d+(?:\.\d+)?)/g, (_m, sign)=> (sign||'') + '#')
+      .replace(/#+(\s+to\s+)#+/g, '# to #') // collapse weird doubled patterns if any
+      .replace(/\s+/g,' ') // tidy spaces
+      .trim()
+  }
+
+  // Initialize stat filters when parsed changes
+  useEffect(()=>{
+    if (!parsed) { setStatFilters({}); return }
+    const rawLines: Array<{text:string,source:'implicit'|'explicit'}> = []
+    if (Array.isArray(parsed.implicits)) parsed.implicits.forEach((t:any)=> rawLines.push({ text: t, source: 'implicit' }))
+    if (Array.isArray(parsed.explicits)) parsed.explicits.forEach((t:any)=> rawLines.push({ text: t, source: 'explicit' }))
+    const map: Record<string,{ enabled:boolean; min:string; max:string; quality:string; text:string; source:string }> = {}
+    const filteredLines = rawLines.filter(r => !(hideCrafted && /crafted/i.test(r.text)))
+    // Helper to accumulate pseudo stats
+    let fire=0,cold=0,light=0,life=0,mana=0,str=0,dex=0,intel=0,esFlat=0
+    filteredLines.forEach((ln, i)=>{
+      const id = `stat_${i}_${ln.text.slice(0,40).replace(/[^a-z0-9]/gi,'')}`
+      const m = ln.text.match(/[-+]?[0-9]+(?:\.[0-9]+)?/)
+      const rawNum = m ? Number(m[0]) : undefined
+      // Provide 80% baseline slack so we don't over-constrain; mimic overlay behaviour of slight reduction.
+      const slackFactor = 0.8
+      const defaultMin = rawNum !== undefined
+        ? String(rawNum >= 10 ? Math.max(1, Math.floor(rawNum * slackFactor)) : Math.max(0, rawNum - 1))
+        : ''
+      // Only enable implicit or prefix-like (expanded list) lines
+      const low = ln.text.toLowerCase()
+      const prefixWords = ['adds','add','increased','reduced','chance','critical','attack','attacks','cast','speed','damage','resistance','life','mana','energy shield','armour','evasion','strength','dexterity','intelligence','attribute','attributes','chaos','elemental']
+      const containsPrefix = prefixWords.some(w=> low.includes(w))
+      // Weighted scoring: implicit always strong; large numeric values & defensive/offensive keywords raise score.
+      let score = 0
+      if (ln.source === 'implicit') score += 3
+      if (containsPrefix) score += 1
+      if (/maximum life|maximum mana|energy shield|resistance|strength|dexterity|intelligence/i.test(ln.text)) score += 2
+      if (/spell damage|attack speed|cast speed|critical/i.test(ln.text)) score += 2
+      if (/all elemental resistances|to fire and cold|to cold and lightning|to fire and lightning/i.test(ln.text)) score += 1
+      if (rawNum && rawNum >= 50) score += 1
+      // Enable if score above threshold; threshold dynamic: keep top N (<=8) after building list (second pass). For now mark provisional.
+      const provisionalEnabled = score >= 3
+      const enabled = provisionalEnabled
+      map[id] = { enabled, min: defaultMin, max: '', quality: parsed?.quality ? String(parsed.quality) : '', text: ln.text, source: ln.source }
+      // Capture pseudo contributions
+      const numMatches = ln.text.match(/[-+]?[0-9]+/g) || []
+      const firstNum = numMatches.length? Number(numMatches[0]):0
+      if (/to Fire Resistance/i.test(ln.text)) fire += firstNum
+      if (/to Cold Resistance/i.test(ln.text)) cold += firstNum
+      if (/to Lightning Resistance/i.test(ln.text)) light += firstNum
+      if (/to maximum Life/i.test(ln.text)) life += firstNum
+      if (/to maximum Mana/i.test(ln.text)) mana += firstNum
+      if (/(^|\s)\+?\d+\s+Strength/i.test(ln.text)) str += firstNum
+      if (/(^|\s)\+?\d+\s+Dexterity/i.test(ln.text)) dex += firstNum
+      if (/(^|\s)\+?\d+\s+Intelligence/i.test(ln.text)) intel += firstNum
+      if (/Energy Shield/i.test(ln.text) && /\d/.test(ln.text)) esFlat += firstNum
+    })
+    const pseudoList: Array<{ id:string; text:string; value:number }> = []
+    const totalEle = fire+cold+light
+    if (totalEle>0) pseudoList.push({ id:'pseudo_total_ele_res', text:'(pseudo) (total) +'+totalEle+'% total Elemental Resistance', value: totalEle })
+    if (life>0) pseudoList.push({ id:'pseudo_total_life', text:'(pseudo) (total) +'+life+' to maximum Life', value: life })
+    if (mana>0) pseudoList.push({ id:'pseudo_total_mana', text:'(pseudo) (total) +'+mana+' to maximum Mana', value: mana })
+    if (str>0) pseudoList.push({ id:'pseudo_total_str', text:'(pseudo) (total) +'+str+' to Strength', value: str })
+    if (dex>0) pseudoList.push({ id:'pseudo_total_dex', text:'(pseudo) (total) +'+dex+' to Dexterity', value: dex })
+    if (intel>0) pseudoList.push({ id:'pseudo_total_int', text:'(pseudo) (total) +'+intel+' to Intelligence', value: intel })
+    if (esFlat>0) pseudoList.push({ id:'pseudo_total_es', text:'(pseudo) (total) +'+esFlat+' to Energy Shield', value: esFlat })
+    setPseudoMods(pseudoList)
+    // Second pass: ensure we don't auto-enable too many (limit 8 highest score) for clarity.
+    const pw: string[] = ['adds','add','increased','reduced','chance','critical','attack','attacks','cast','speed','damage','resistance','life','mana','energy shield','armour','evasion','strength','dexterity','intelligence','attribute','attributes','chaos','elemental']
+    const scored = Object.entries(map).map(([id,st]) => {
+      // recreate score quickly
+      const txt = st.text.toLowerCase()
+      let s = 0
+      if (st.source === 'implicit') s += 3
+      if (pw.some((w:string)=> txt.includes(w))) s += 1
+      if (/maximum life|maximum mana|energy shield|resistance|strength|dexterity|intelligence/.test(txt)) s += 2
+      if (/spell damage|attack speed|cast speed|critical/.test(txt)) s += 2
+      if (/all elemental resistances|to fire and cold|to cold and lightning|to fire and lightning/.test(txt)) s += 1
+      const num = parseInt(st.min || '0',10)
+      if (num >= 50) s += 1
+      return { id, st, s }
+    })
+    scored.sort((a,b)=> b.s - a.s)
+    const keepEnabled = new Set(scored.slice(0,8).filter(e=> e.s >= 2).map(e=> e.id))
+    const finalMap: typeof map = {}
+    for (const { id, st } of scored) {
+      finalMap[id] = { ...st, enabled: keepEnabled.has(id) }
+    }
+    setStatFilters(finalMap)
+  // Mark filters dirty after initial parse only if a search already occurred
+  setFiltersDirty(prev=> searchPerformed ? true : prev)
+  }, [parsed])
+
+  // showFilters toggles the inline filter panel in the form
+
   const handleSearch = async () => {
     setError(null)
+  setSearchPerformed(true)
     if (mode==='simple') {
       if (!searchTerm.trim()) return
       setLoading(true)
-      try {
-  const query = poeApi.buildItemQuery(searchTerm, { online: true })
+  try {
+  const query = poeApi.buildItemQuery(searchTerm, { online: onlineOnly })
+  // add currency/rarity quick filters
+  if (currencyFilter) {
+    query.query.filters = { ...query.query.filters, trade_filters: { filters: { price: { option: currencyFilter } } } }
+  }
+  if (rarityFilter && rarityFilter !== 'any') {
+    query.query.filters = { ...query.query.filters, type_filters: { filters: { rarity: { option: rarityFilter } } } }
+  }
   setLastQuery(query)
         const searchResult = await poeApi.searchItems(selectedLeague, query)
-  setTradeSearchId(searchResult.id)
-        const itemDetails = await poeApi.getItemDetails(searchResult.id, searchResult.result)
-        setSearchResults(itemDetails)
-        summarize(itemDetails)
+  setTradeSearchId(searchResult?.id || null)
+        if (!searchResult || !searchResult.id || !Array.isArray(searchResult.result) || !searchResult.result.length) {
+          // Preserve existing results if we had any previously
+          if (lastSuccessfulResults.length) {
+            setError('No new listings found (showing previous)')
+            setSearchResults(lastSuccessfulResults)
+          } else {
+            throw new Error('empty_search_result')
+          }
+        } else {
+          const itemDetails = await poeApi.getItemDetails(searchResult.id, searchResult.result)
+          setSearchResults(itemDetails)
+          setLastSuccessfulResults(itemDetails)
+          await summarize(itemDetails, selectedLeague)
+          try { const avg = await poeApi.averageListingPrice(itemDetails, selectedLeague); setExactPrice(avg) } catch {}
+        }
       } catch (e:any) {
         console.error('Search failed', e)
-        setError('Search failed')
+        if (typeof e?.message === 'string' && e.message.startsWith('rate_limited:')) {
+          const secs = parseInt(e.message.split(':')[1]||'0',10)
+          setError(`Rate limited – wait ${secs}s before retrying.`)
+        } else {
+          setError('Search failed')
+        }
         setSearchResults([])
         setPriceSummary(null)
+    setExactPrice(null)
       } finally { setLoading(false) }
     } else {
       // Clipboard mode
@@ -54,25 +235,178 @@ export function ItemPriceChecker() {
       fetchPoePriceEstimate(rawClipboard, selectedLeague)
       
       try {
-  const query = buildTradeQueryFromParsed(p)
-  setLastQuery(query)
-        const searchResult = await poeApi.searchItems(selectedLeague, query)
-  setTradeSearchId(searchResult.id)
-        const ids = searchResult.result.slice(0, 30) // cap for speed
-        const details = await poeApi.getItemDetails(searchResult.id, ids)
-        setSearchResults(details)
-        summarize(details)
+        const parsedP = p
+        const query = buildTradeQueryFromParsed(parsedP)
+        setLastQuery(query)
+        let searchResult: any
+        try {
+          searchResult = await poeApi.searchItems(selectedLeague, query)
+        } catch (err:any) {
+          if (typeof err?.message === 'string' && err.message.startsWith('rate_limited:')) {
+            const secs = parseInt(err.message.split(':')[1]||'0',10)
+            setError(`Rate limited – wait ${secs}s before retrying.`)
+            setLoading(false)
+            return
+          }
+          throw err
+        }
+        let effectiveLeague = selectedLeague
+        setTradeSearchId(searchResult?.id || null)
+        const isUnique = parsedP.rarity && parsedP.rarity.toLowerCase()==='unique'
+        // Helper to determine if result payload is empty
+        const isEmpty = (res:any) => (!res || !res.id || !Array.isArray(res.result) || !res.result.length)
+        if (isEmpty(searchResult)) {
+          // Fallback 1 (unique only): remove stats block
+          if (isUnique && query?.query?.stats) {
+            const fallbackQuery = JSON.parse(JSON.stringify(query))
+            delete fallbackQuery.query.stats
+            try {
+              const retry = await poeApi.searchItems(selectedLeague, fallbackQuery)
+              if (!isEmpty(retry)) {
+                setLastQuery(fallbackQuery)
+                setTradeSearchId(retry.id)
+                searchResult = retry as any
+              } else {
+                // proceed to next fallback
+              }
+            } catch {/* ignore and continue */}
+          }
+        }
+        if (isEmpty(searchResult)) {
+          // Fallback 2: try Standard league (often uniques absent in temp league late cycle)
+            if (!/^Standard$/i.test(selectedLeague)) {
+              const stdQuery = JSON.parse(JSON.stringify(query))
+              try {
+                const retryStd = await poeApi.searchItems('Standard', stdQuery)
+                if (!isEmpty(retryStd)) {
+                  effectiveLeague = 'Standard'
+                  setLastQuery(stdQuery)
+                  setTradeSearchId(retryStd.id)
+                  searchResult = retryStd as any
+                }
+              } catch {/* ignore */}
+            }
+        }
+        if (isEmpty(searchResult)) {
+          // Fallback 3: relax online filter to any (sometimes no online listings)
+          if (query?.query?.status?.option === 'online') {
+            const anyQuery = JSON.parse(JSON.stringify(query))
+            if (anyQuery.query?.status) anyQuery.query.status.option = 'any'
+            try {
+              const retryAny = await poeApi.searchItems(effectiveLeague, anyQuery)
+              if (!isEmpty(retryAny)) {
+                setLastQuery(anyQuery)
+                setTradeSearchId(retryAny.id)
+                searchResult = retryAny as any
+              }
+            } catch {/* ignore */}
+          }
+        }
+        if (isEmpty(searchResult)) {
+          throw new Error('empty_search_result')
+        }
+        // Helper to test matches with optional relaxFactor (to lower min thresholds further)
+        const testMatches = (item: TradeItem, relaxFactor = 1) => {
+          const mods: string[] = []
+          if (Array.isArray(item.item.implicitMods)) mods.push(...item.item.implicitMods)
+          if (Array.isArray(item.item.explicitMods)) mods.push(...item.item.explicitMods)
+          for (const st of Object.values(statFilters)) {
+            if (!st.enabled) continue
+            const needle = (st.text || '').toLowerCase()
+            if (!needle) continue
+            const found = mods.find(m=> m.toLowerCase().includes(needle))
+            if (!found) return false
+            const nums = (found.match(/[-+]?[0-9]+(?:\.[0-9]+)?/g) || []).map(Number)
+            const minValOrig = st.min ? Number(st.min) : undefined
+            const maxVal = st.max ? Number(st.max) : undefined
+            const minVal = (minValOrig !== undefined) ? Math.floor(minValOrig * relaxFactor) : undefined
+            if (minVal !== undefined) {
+              const maxNum = nums.length ? Math.max(...nums) : undefined
+              if (maxNum === undefined || maxNum < minVal) return false
+            }
+            if (maxVal !== undefined) {
+              const minNum = nums.length ? Math.min(...nums) : undefined
+              if (minNum === undefined || minNum > maxVal) return false
+            }
+          }
+          return true
+        }
+
+        const allIds = searchResult.result
+        const batchSize = 20
+        let fetched: TradeItem[] = []
+        let filteredDetails: TradeItem[] = []
+        // Progressive fetch until we have matches or reach limits
+        for (let offset=0; offset < allIds.length && offset < 200 && filteredDetails.length < 8; offset += batchSize) {
+          const slice = allIds.slice(offset, offset + batchSize)
+          const batch = await poeApi.getItemDetails(searchResult.id, slice)
+          fetched = fetched.concat(batch)
+          filteredDetails = fetched.filter(it=> testMatches(it, 1))
+        }
+        // If still none, relax thresholds (0.9 then 0.8) and/or broaden sample if possible
+        if (!filteredDetails.length) {
+          // Try relaxation on already fetched items first
+            filteredDetails = fetched.filter(it=> testMatches(it, 0.9))
+        }
+        if (!filteredDetails.length) {
+          filteredDetails = fetched.filter(it=> testMatches(it, 0.8))
+        }
+        // If still none and we haven't exhausted IDs, fetch more ignoring match cap
+        if (!filteredDetails.length) {
+          for (let offset = fetched.length; offset < allIds.length && offset < 300 && !filteredDetails.length; offset += batchSize) {
+            const slice = allIds.slice(offset, offset + batchSize)
+            const batch = await poeApi.getItemDetails(searchResult.id, slice)
+            fetched = fetched.concat(batch)
+            filteredDetails = fetched.filter(it=> testMatches(it, 0.8))
+          }
+        }
+        setSearchResults(filteredDetails)
+      try { const avg2 = await poeApi.averageListingPrice(filteredDetails, selectedLeague); setExactPrice(avg2) } catch {}
+  await summarize(filteredDetails, selectedLeague)
       } catch (e:any) {
-        console.error('Clipboard pricing failed', e)
-        const msg = (e?.message||'').includes('proxy_http_')? 'Trade API error' : 'Pricing failed (API)'
-        setError(msg)
-        setSearchResults([])
-        setPriceSummary(null)
+  console.error('Clipboard pricing failed', e)
+  const raw = e?.message || String(e)
+  // If it's a proxy_http error include full raw payload so user can copy upstream PoE response
+  let msg = 'Pricing failed (API)'
+  if ((raw||'').startsWith('rate_limited:')) {
+    const secs = parseInt(raw.split(':')[1]||'0',10)
+    msg = `Rate limited – wait ${secs}s before retrying.`
+  }
+  if ((raw||'').startsWith('proxy_http_')) {
+    const payload = raw.replace(/^proxy_http_\d+\s*/, '')
+    try {
+      const parsedPayload = JSON.parse(payload)
+      // If upstream response included a response.error.message show it
+      const upstream = parsedPayload.response || parsedPayload.body || parsedPayload
+      if (upstream && upstream.error && upstream.error.message) {
+        msg = `Trade upstream: ${upstream.error.message}`
+      } else {
+        msg = `Trade API error: ${payload}`
+      }
+    } catch (pe) {
+      msg = `Trade API error: ${payload}`
+    }
+  } else if ((raw||'').includes('empty_search_result')) {
+    msg = lastSuccessfulResults.length ? 'No listings now – showing previous results' : 'No listings found'
+  }
+  setError(msg)
+    setSearchResults([])
+      setExactPrice(null)
+  setPriceSummary(null)
       } finally { setLoading(false) }
     }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => { if (e.key==='Enter' && e.metaKey) handleSearch() }
+
+  const handlePasteSubmit = () => {
+    if (!rawClipboard.trim()) { setError('Paste item text first'); return }
+    const p = parseClipboard(rawClipboard)
+    setExactPrice(null)
+    setParsed(p)
+    // statFilters will be initialized by useEffect
+    setError(null)
+  }
 
   // Parse PoE clipboard text (approx)
   const parseClipboard = (raw: string) => {
@@ -92,7 +426,14 @@ export function ItemPriceChecker() {
       else if (/Armour:/i.test(line)) { const m=line.match(/Armour:\s*(\d+)/i); if (m) obj.armour=Number(m[1]) }
       else if (/Evasion Rating:/i.test(line)) { const m=line.match(/Evasion Rating:\s*(\d+)/i); if (m) obj.evasion=Number(m[1]) }
       else if (/Item Level:/i.test(line)) { const m=line.match(/Item Level:\s*(\d+)/i); if (m) obj.itemLevel=Number(m[1]) }
-      else if (/^Sockets:/i.test(line)) { obj.sockets = line.replace(/^Sockets:\s*/i,''); obj.links = largestLinkGroup(obj.sockets) }
+      else if (/^Sockets:/i.test(line)) {
+        obj.sockets = line.replace(/^Sockets:\s*/i,'').trim()
+        obj.links = largestLinkGroup(obj.sockets)
+        try {
+          const socketMeta = parseSockets(obj.sockets)
+          obj.socketInfo = socketMeta
+        } catch {/* ignore parse errors */}
+      }
       else if (/Searing Exarch Item/i.test(line)) obj.influences.push('searing_exarch')
       else if (/Eater of Worlds Item/i.test(line)) obj.influences.push('eater_of_worlds')
     }
@@ -132,6 +473,7 @@ export function ItemPriceChecker() {
 
   const fetchPoePriceEstimate = async (itemText: string, league: string) => {
     setPoePriceResult(null)
+  setPoePriceNote(null)
     setPoePriceLoading(true)
     try {
       const response = await fetch('/api/poeprices', {
@@ -145,7 +487,20 @@ export function ItemPriceChecker() {
       }
 
       const data = await response.json()
-      
+      // Upstream mapped errors return { error:'poeprices_error', code, message }
+      if (data && data.error === 'poeprices_error') {
+        console.warn('PoePrice API returned mapped error:', data.code, data.message)
+        setPoePriceResult(null)
+        // Provide user-facing explanation for common codes
+        if (data.code === 5) {
+          setPoePriceNote('ML estimate unavailable: not enough similar listings (use heuristic values).')
+        } else if (data.code === 3) {
+          setPoePriceNote('ML estimate skipped: item appears unpriceable / meta not supported.')
+        } else {
+          setPoePriceNote('ML estimate unavailable.')
+        }
+        return
+      }
       // Handle successful response from poeprices.info
       if (data && data.min && data.max && data.currency) {
         setPoePriceResult({
@@ -156,25 +511,59 @@ export function ItemPriceChecker() {
         })
       } else if (data.error) {
         console.warn('PoePrice API returned error:', data.error)
+        setPoePriceNote('ML estimate error.')
       }
     } catch (e) {
       console.error('Failed to fetch poeprices estimate:', e)
+      setPoePriceNote('ML estimate request failed (network).')
     } finally {
       setPoePriceLoading(false)
     }
   }
 
   const largestLinkGroup = (socketStr:string): number => {
-    // Example: G-G-B-B-B-B or R-G-B | groups separated by spaces
-    const groups = socketStr.split(/\s|,/).filter(Boolean)
-    let max=0
-    groups.forEach(g=>{ const links = g.split('-').length; if(links>max) max=links })
+    // Groups separated by spaces or commas; within a group sockets separated by '-'
+    if (!socketStr) return 0
+    const groups = socketStr.trim().split(/\s+|,/).filter(Boolean)
+    let max = 0
+    for (const g of groups) {
+      // Defensive: strip non socket chars
+      const cleaned = g.replace(/[^RGBWA-]/gi,'')
+      if (!cleaned) continue
+      const links = cleaned.split('-').filter(Boolean).length
+      if (links > max) max = links
+    }
     return max
+  }
+
+  // Parse sockets string into structured info: total count, color counts, groups, largest link group length
+  const parseSockets = (socketStr: string) => {
+    // Game format examples:
+    //  "G-B-B-R-R" (all linked)
+    //  "G-B-B R-R" (two groups: 3L and 2L)
+    //  "G-G-G-G-G-G" (6L)
+    //  "R-G-B-W" (4L with a white socket)
+    //  Abyssal sockets sometimes show as "R-G-B A" (treat A separately)
+    const groupTokens = socketStr.trim().split(/\s+/).filter(Boolean)
+    const groups: string[][] = groupTokens.map(tok => tok.split('-').filter(Boolean))
+    const colors: Record<string, number> = {}
+    let total = 0
+    let largest = 0
+    groups.forEach(g => {
+      largest = Math.max(largest, g.length)
+      g.forEach(c => {
+        const up = c.toUpperCase()
+        colors[up] = (colors[up]||0)+1
+        total++
+      })
+    })
+    return { socketGroups: groups, socketCounts: colors, totalSockets: total, largestLink: largest }
   }
 
   const buildTradeQueryFromParsed = (p:any) => {
     const rarity = (p.rarity||'').toLowerCase()
-    const query:any = { query:{ status:{ option:'online' }, filters:{} as any }, sort:{ price:'asc' } }
+    const isUnique = rarity==='unique'
+    const query:any = { query:{ status:{ option: onlineOnly ? 'online' : 'any' }, stats:[{ type:'and', filters:[] as any[] }], filters:{} as any }, sort:{ price:'asc' } }
     if (rarity==='unique') {
       if (p.name) query.query.name = p.name
       if (p.baseType && p.baseType!==p.name) query.query.type = p.baseType
@@ -185,69 +574,448 @@ export function ItemPriceChecker() {
     } else {
       if (p.baseType) query.query.type = p.baseType
     }
-    const miscFilters:any = {}
-    if (p.quality) miscFilters.quality = { min: p.quality }
-    if (p.itemLevel) miscFilters.ilvl = { min: Math.max(1,p.itemLevel-2), max: p.itemLevel }
-    if (Object.keys(miscFilters).length) query.query.filters.misc_filters = { filters: miscFilters }
-    if (p.links && p.links>=5) query.query.filters.socket_filters = { filters:{ links:{ min:p.links } } }
-    if (p.energyShield) query.query.filters.armor_filters = { filters:{ es:{ min: Math.floor(p.energyShield*0.9), max: p.energyShield+5 } } }
-    if (p.armour || p.evasion) {
-      query.query.filters.armor_filters = query.query.filters.armor_filters || { filters:{} }
-      if (p.armour) query.query.filters.armor_filters.filters.ar = { min: Math.floor(p.armour*0.9) }
-      if (p.evasion) query.query.filters.armor_filters.filters.ev = { min: Math.floor(p.evasion*0.9) }
+  // Only include safe misc filters (avoid unknown/unsupported filter group names)
+  const miscFilters:any = {}
+  // clip input values from quick filters or parsed item
+  const qMin = qualityMin ? parseInt(qualityMin) : (p.quality || undefined)
+  const qMax = qualityMax ? parseInt(qualityMax) : undefined
+  const iMin = ilvlMin ? parseInt(ilvlMin) : (p.itemLevel ? Math.max(1,p.itemLevel-2) : undefined)
+  const iMax = ilvlMax ? parseInt(ilvlMax) : (p.itemLevel ? p.itemLevel : undefined)
+  if (qMin !== undefined) miscFilters.quality = { min: qMin }
+  if (iMin !== undefined || iMax !== undefined) miscFilters.ilvl = { min: iMin || 1, max: iMax || (iMin || 100) }
+  if (linksMin) {
+    const ln = parseInt(linksMin)
+    if (!isNaN(ln)) miscFilters.links = { min: ln }
+  }
+  if (Object.keys(miscFilters).length) query.query.filters = { misc_filters: { filters: miscFilters } }
+  // Price currency and rarity filter
+  if (currencyFilter) {
+    query.query.filters = { ...query.query.filters, trade_filters: { filters: { price: { option: currencyFilter } } } }
+  }
+  if (rarityFilter && rarityFilter !== 'any') {
+    query.query.filters = { ...query.query.filters, type_filters: { filters: { rarity: { option: rarityFilter } } } }
+  }
+  // Note: avoid adding armor_filters, socket_filters, or influence_filters here — PoE rejects unknown groups.
+  // Aggregate enabled stat lines into pseudo stats for broader similarity (prevents over-narrow queries)
+  const agg: Record<string, number> = {}
+  const add = (id:string,val:number)=> { if(!val||!isFinite(val)) return; agg[id]=(agg[id]||0)+val }
+  const enabledLines = Object.values(statFilters).filter(st=> st.enabled)
+  // Skip pseudo aggregation for unique items (name/type usually enough; mods vary widely and over-constrain search)
+  if (!isUnique) enabledLines.forEach(st=> {
+    const text = (st.text||'').toLowerCase()
+    // numbers (first or max) for value extraction
+    const nums = (text.match(/[-+]?[0-9]+(?:\.[0-9]+)?/g)||[]).map(Number)
+    const first = nums[0]
+    // Life / Mana / ES
+    if (/to maximum life/.test(text) && !/%/.test(text)) add('pseudo.pseudo_total_life', first)
+    if (/to maximum mana/.test(text) && !/%/.test(text)) add('pseudo.pseudo_total_mana', first)
+    if (/to maximum energy shield/.test(text) && !/%/.test(text)) add('pseudo.pseudo_total_energy_shield', first)
+    // Attributes
+    if (/\bstrength\b/.test(text)) add('pseudo.pseudo_total_strength', first)
+    if (/\bdexterity\b/.test(text)) add('pseudo.pseudo_total_dexterity', first)
+    if (/\bintelligence\b/.test(text)) add('pseudo.pseudo_total_intelligence', first)
+    if (/all attributes/.test(text)) add('pseudo.pseudo_total_all_attributes', first)
+    // Resistances (single)
+    if (/to fire resistance/.test(text)) add('pseudo.pseudo_total_fire_resistance', first)
+    if (/to cold resistance/.test(text)) add('pseudo.pseudo_total_cold_resistance', first)
+    if (/to lightning resistance/.test(text)) add('pseudo.pseudo_total_lightning_resistance', first)
+    if (/to chaos resistance/.test(text)) add('pseudo.pseudo_total_chaos_resistance', first)
+    if (/to all elemental resistances/.test(text)) add('pseudo.pseudo_total_elemental_resistance', first)
+    if (/to fire and cold resistances/.test(text)) { add('pseudo.pseudo_total_fire_resistance', first); add('pseudo.pseudo_total_cold_resistance', first) }
+    if (/to fire and lightning resistances/.test(text)) { add('pseudo.pseudo_total_fire_resistance', first); add('pseudo.pseudo_total_lightning_resistance', first) }
+    if (/to cold and lightning resistances/.test(text)) { add('pseudo.pseudo_total_cold_resistance', first); add('pseudo.pseudo_total_lightning_resistance', first) }
+    // Damage / speed / spell relevant
+    if (/increased spell damage/.test(text)) add('pseudo.pseudo_increased_spell_damage', first)
+    if (/increased cast speed/.test(text)) add('pseudo.pseudo_total_cast_speed', first)
+    if (/increased attack speed/.test(text)) add('pseudo.pseudo_total_attack_speed', first)
+    if (/movement speed/.test(text)) add('pseudo.pseudo_total_movement_speed', first)
+  // NOTE: Spell critical strike chance pseudo stat id used earlier caused upstream error (unknown stat).
+  // The trade API does not recognize 'pseudo.pseudo_total_spell_critical_strike_chance'. Until correct id is confirmed, omit it.
+  })
+  // If we captured individual elemental resistances but not explicit total, compute combined & add (PoE pseudo expects sum of %)
+  if (!isUnique) {
+    const eleSum = (agg['pseudo.pseudo_total_fire_resistance']||0)+(agg['pseudo.pseudo_total_cold_resistance']||0)+(agg['pseudo.pseudo_total_lightning_resistance']||0)
+    if (eleSum>0 && !agg['pseudo.pseudo_total_elemental_resistance']) {
+      agg['pseudo.pseudo_total_elemental_resistance'] = eleSum
     }
-    if (Array.isArray(p.influences) && p.influences.length) {
-      const infFilters:any = {}
-      p.influences.forEach((inf:string)=>{ infFilters[inf] = { option: 'true' } })
-      query.query.filters.influence_filters = { filters: infFilters }
+  }
+  // Decide which resist filters to include: prefer total elemental if we have at least two elements contributing
+  const elementCount = ['pseudo.pseudo_total_fire_resistance','pseudo.pseudo_total_cold_resistance','pseudo.pseudo_total_lightning_resistance'].filter(id=> agg[id]).length
+  const filtersToEmit: Array<{id:string; value:{min:number}}>=[]
+  if (!isUnique) Object.entries(agg).forEach(([id,val])=>{
+    // Allowlist only known-safe pseudo stat ids to avoid upstream 'Unknown stat provided' errors.
+    const allowed = new Set([
+      'pseudo.pseudo_total_life',
+      'pseudo.pseudo_total_mana',
+      'pseudo.pseudo_total_energy_shield',
+      'pseudo.pseudo_total_strength',
+      'pseudo.pseudo_total_dexterity',
+      'pseudo.pseudo_total_intelligence',
+      'pseudo.pseudo_total_all_attributes',
+      'pseudo.pseudo_total_fire_resistance',
+      'pseudo.pseudo_total_cold_resistance',
+      'pseudo.pseudo_total_lightning_resistance',
+      'pseudo.pseudo_total_chaos_resistance',
+      'pseudo.pseudo_total_elemental_resistance',
+      'pseudo.pseudo_increased_spell_damage',
+      'pseudo.pseudo_total_cast_speed',
+      'pseudo.pseudo_total_attack_speed',
+      'pseudo.pseudo_total_movement_speed'
+    ])
+    if (!allowed.has(id)) return
+    if (id==='pseudo.pseudo_total_elemental_resistance' && elementCount>=2) {
+      const min = Math.max(1, Math.floor(val*0.75))
+      filtersToEmit.push({ id, value:{ min } })
+    } else if (!id.startsWith('pseudo.pseudo_total_elemental_resistance')) {
+      // Skip individual elements if we emitted total; else include them
+      if (['pseudo.pseudo_total_fire_resistance','pseudo.pseudo_total_cold_resistance','pseudo.pseudo_total_lightning_resistance'].includes(id) && elementCount>=2) return
+      const min = val>10? Math.floor(val*0.8): Math.max(1, Math.floor(val*0.7))
+      filtersToEmit.push({ id, value:{ min } })
     }
+  })
+  if (filtersToEmit.length) {
+    const validId = /^(pseudo\.|explicit\.|implicit\.|enchant\.|crafted\.|fractured\.|veiled\.|monster\.|delve\.|ultimatum\.|crucible\.)/i
+    query.query.stats[0].filters.push(...filtersToEmit.filter(f=> validId.test(f.id)))
+  }
+  if (!query.query.stats[0].filters.length) delete query.query.stats
     return query
   }
 
-  const summarize = (items: TradeItem[]) => {
+  // Track dirty state when user modifies any stat filter
+  useEffect(()=> {
+    if (searchPerformed) setFiltersDirty(true)
+  }, [statFilters, searchPerformed])
+
+  const rerunSearchWithCurrentFilters = async () => {
+    if (!parsed) return
+    setError(null)
+    setAutoStrippedPseudos(null)
+  setApproximateResults(false)
+  // Reset stale no-match state; we'll set back to true only if this run truly yields none
+  setNoFilterMatch(false)
+    setLoading(true)
+    try {
+      const p = parsed
+  const hadPrevious = lastSuccessfulResults.length
+      const query = buildTradeQueryFromParsed(p)
+      setLastQuery(query)
+      let searchResult: any
+      let initialError: any = null
+      try {
+        searchResult = await poeApi.searchItems(selectedLeague, query)
+        console.debug('[price-checker][rerun] primary result count', searchResult?.result?.length)
+      } catch (err:any) {
+        if (typeof err?.message === 'string' && err.message.startsWith('rate_limited:')) {
+          const secs = parseInt(err.message.split(':')[1]||'0',10)
+          setError(`Rate limited – wait ${secs}s before retrying.`)
+          setLoading(false)
+          return
+        }
+        initialError = err
+        console.warn('[price-checker][rerun] primary error', err)
+      }
+      const isUnique = p.rarity && p.rarity.toLowerCase()==='unique'
+      const isEmpty = (res:any) => (!res || !res.id || !Array.isArray(res.result) || !res.result.length)
+      // Auto-strip pseudo filters if initial query failed or empty
+      const hasPseudo = !!(query?.query?.stats?.[0]?.filters?.some((f:any)=> /^pseudo\./i.test(f.id)))
+      if ((initialError || isEmpty(searchResult)) && hasPseudo) {
+        const stripped = JSON.parse(JSON.stringify(query))
+        if (stripped.query?.stats?.[0]?.filters) {
+          stripped.query.stats[0].filters = stripped.query.stats[0].filters.filter((f:any)=> !/^pseudo\./i.test(f.id))
+          if (!stripped.query.stats[0].filters.length) delete stripped.query.stats
+        }
+        try {
+          const retry = await poeApi.searchItems(selectedLeague, stripped)
+          if (!isEmpty(retry)) {
+            searchResult = retry
+            setLastQuery(stripped)
+            setAutoStrippedPseudos({ reason: initialError? 'invalid query' : 'no matches' })
+            console.debug('[price-checker][rerun] recovered after stripping pseudos', retry.result.length)
+          }
+        } catch {/* ignore */}
+      }
+      if (isEmpty(searchResult) && isUnique && query?.query?.stats) {
+        const fallbackQuery = JSON.parse(JSON.stringify(query))
+        delete fallbackQuery.query.stats
+        try {
+          const retry = await poeApi.searchItems(selectedLeague, fallbackQuery)
+          if (!isEmpty(retry)) { searchResult = retry; setLastQuery(fallbackQuery) }
+        } catch {/* ignore */}
+      }
+      if (isEmpty(searchResult) && !/^Standard$/i.test(selectedLeague)) {
+        const stdQuery = JSON.parse(JSON.stringify(query))
+        try {
+          const retryStd = await poeApi.searchItems('Standard', stdQuery)
+          if (!isEmpty(retryStd)) { searchResult = retryStd; }
+        } catch {/* ignore */}
+      }
+      if (isEmpty(searchResult)) {
+        if (query?.query?.status?.option === 'online') {
+          const anyQuery = JSON.parse(JSON.stringify(query))
+          if (anyQuery.query?.status) anyQuery.query.status.option = 'any'
+          try {
+            const retryAny = await poeApi.searchItems(selectedLeague, anyQuery)
+            if (!isEmpty(retryAny)) { searchResult = retryAny; setLastQuery(anyQuery) }
+          } catch {/* ignore */}
+        }
+      }
+    if (isEmpty(searchResult)) {
+        // No results after applying current filters & fallbacks.
+        // If we have prior successful results + summary, preserve them instead of wiping Suggested price.
+        if (lastSuccessfulResults.length && priceSummary) {
+          setError('No listings for current filters (showing previous)')
+          setNoFilterMatch(true)
+          // Force searchResults to mirror lastSuccessful for any code paths reading it directly
+            setSearchResults(lastSuccessfulResults)
+          setFiltersDirty(false)
+          // Don't clear previous summary / exact price; just abort rerun early.
+      console.debug('[price-checker][rerun] early preserve previous results')
+          return
+        } else {
+          setError('No listings found')
+          setSearchResults([])
+          setPriceSummary(null)
+          setExactPrice(null)
+      console.debug('[price-checker][rerun] no listings and nothing to preserve')
+          return
+        }
+      }
+      setTradeSearchId(searchResult.id || null)
+      const allIds = searchResult.result
+      const batchSize = 20
+      let fetched: TradeItem[] = []
+      let filteredDetails: TradeItem[] = []
+      const testMatches = (item: TradeItem, relaxFactor = 1) => {
+        const mods: string[] = []
+        if (Array.isArray(item.item.implicitMods)) mods.push(...item.item.implicitMods)
+        if (Array.isArray(item.item.explicitMods)) mods.push(...item.item.explicitMods)
+        for (const st of Object.values(statFilters)) {
+          if (!st.enabled) continue
+          const needle = (st.text || '').toLowerCase()
+          if (!needle) continue
+          const found = mods.find(m=> m.toLowerCase().includes(needle))
+          if (!found) return false
+          const nums = (found.match(/[-+]?[0-9]+(?:\.[0-9]+)?/g) || []).map(Number)
+          const minValOrig = st.min ? Number(st.min) : undefined
+          const maxVal = st.max ? Number(st.max) : undefined
+          const minVal = (minValOrig !== undefined) ? Math.floor(minValOrig * relaxFactor) : undefined
+          if (minVal !== undefined) {
+            const maxNum = nums.length ? Math.max(...nums) : undefined
+            if (maxNum === undefined || maxNum < minVal) return false
+          }
+          if (maxVal !== undefined) {
+            const minNum = nums.length ? Math.min(...nums) : undefined
+            if (minNum === undefined || minNum > maxVal) return false
+          }
+        }
+        return true
+      }
+      for (let offset=0; offset < allIds.length && offset < 200 && filteredDetails.length < 8; offset += batchSize) {
+        const slice = allIds.slice(offset, offset + batchSize)
+        const batch = await poeApi.getItemDetails(searchResult.id, slice)
+        fetched = fetched.concat(batch)
+        filteredDetails = fetched.filter(it=> testMatches(it, 1))
+      }
+      if (!filteredDetails.length) filteredDetails = fetched.filter(it=> testMatches(it, 0.9))
+      if (!filteredDetails.length) filteredDetails = fetched.filter(it=> testMatches(it, 0.8))
+      if (!filteredDetails.length) {
+        for (let offset = fetched.length; offset < allIds.length && offset < 300 && !filteredDetails.length; offset += batchSize) {
+          const slice = allIds.slice(offset, offset + batchSize)
+          const batch = await poeApi.getItemDetails(searchResult.id, slice)
+          fetched = fetched.concat(batch)
+          filteredDetails = fetched.filter(it=> testMatches(it, 0.8))
+        }
+      }
+      if (!filteredDetails.length) {
+        // Preserve previous successful results & summary; mark no match state
+        setNoFilterMatch(true)
+        setFiltersDirty(false)
+        if (lastSuccessfulResults.length) {
+          setSearchResults(lastSuccessfulResults)
+          console.debug('[price-checker][rerun] using lastSuccessfulResults', lastSuccessfulResults.length)
+        } else if (fetched.length) {
+          // As a last resort, surface approximate results (first few fetched) so user sees something
+          const approx = fetched.slice(0, Math.min(12, fetched.length))
+          setApproximateResults(true)
+          setSearchResults(approx)
+          setNoFilterMatch(false) // we are showing something (approximate)
+          setError('No exact stat matches – showing closest recent listings.')
+          console.debug('[price-checker][rerun] showing approximate fallback', approx.length)
+        }
+      } else {
+        setNoFilterMatch(false)
+        setSearchResults(filteredDetails)
+        setLastSuccessfulResults(filteredDetails)
+        try { const avg2 = await poeApi.averageListingPrice(filteredDetails, selectedLeague); setExactPrice(avg2) } catch {}
+        await summarize(filteredDetails, selectedLeague)
+        setFiltersDirty(false)
+        if (autoStrippedPseudos) {
+          setError('Auto-removed pseudo filters to recover results.')
+        }
+        console.debug('[price-checker][rerun] new filtered result set', filteredDetails.length)
+      }
+      // Safety: if after logic we still have zero displayed but had previous, fall back to previous
+      if (!noFilterMatch && searchResults.length===0 && hadPrevious) {
+        setNoFilterMatch(true)
+        setSearchResults(lastSuccessfulResults)
+        console.debug('[price-checker][rerun] safety fallback engaged', lastSuccessfulResults.length)
+      }
+    } catch (e:any) {
+      console.error('Re-run pricing failed', e)
+      const raw = e?.message || String(e)
+      if ((raw||'').startsWith('rate_limited:')) {
+        const secs = parseInt(raw.split(':')[1]||'0',10)
+        setError(`Rate limited – wait ${secs}s before retrying.`)
+      } else {
+        setError('Re-run failed')
+      }
+      // Preserve last success on failure
+      setNoFilterMatch(false)
+    } finally { setLoading(false) }
+  }
+
+  // Enhanced price summarization with currency normalization & outlier handling (closer to poeprices behaviour)
+  const summarize = async (items: TradeItem[], league: string) => {
     const priced = items.filter(i=> i.listing.price && typeof i.listing.price.amount==='number')
     if (!priced.length) { setPriceSummary(null); return }
-    const amountsRaw = priced.map(i=> i.listing.price!.amount).filter(a=>a>0)
-    if(!amountsRaw.length){ setPriceSummary(null); return }
-    const sorted = [...amountsRaw].sort((a,b)=>a-b)
-    // Trim 10% each side for >=10 samples
-    let trimmed = sorted
-    if (sorted.length>=10) {
-      const cut = Math.floor(sorted.length*0.1)
-      trimmed = sorted.slice(cut, sorted.length-cut)
+    // Group by currency
+    const buckets: Record<string, number[]> = {}
+    priced.forEach(i=> {
+      const cur = (i.listing.price!.currency||'chaos').toLowerCase()
+      if (!buckets[cur]) buckets[cur] = []
+      buckets[cur].push(i.listing.price!.amount)
+    })
+    // If all chaos just use directly; otherwise fetch conversion rates (reuse logic similar to averageListingPrice)
+    let chaosValues: number[] = []
+    const currencies = Object.keys(buckets)
+    // Always fetch currency data so we can compute divine conversion & exchange rate
+    let divineRate: number | null = null
+    let rates: Record<string, number> = { chaosorb:1, chaos:1 }
+    try {
+      const data = await poeApi.getCurrencyData(league)
+      data.forEach(d=> { if (typeof d.chaosEquivalent==='number') rates[d.currencyTypeName.toLowerCase().replace(/[^a-z]/g,'')] = d.chaosEquivalent })
+      // Divine Orb detailsId sometimes 'divine-orb'; map by name
+      const divineKey = Object.keys(rates).find(k=> /divine/.test(k))
+      if (divineKey) divineRate = rates[divineKey]
+    } catch {/* ignore */}
+    if (currencies.length===1 && currencies[0].includes('chaos')) {
+      chaosValues = buckets[currencies[0]].slice()
+    } else {
+      const norm = (s:string)=> s.toLowerCase().replace(/[^a-z]/g,'')
+      const synonyms: Record<string,string> = { c:'chaos', chaosorb:'chaos', divineorb:'divine', divine:'divine', exa:'divine', exaltedorb:'divine' }
+      currencies.forEach(cur=> {
+        const key = norm(cur)
+        const mapped = synonyms[key] || key
+        const rate = rates[mapped] || (mapped==='chaos'?1: undefined)
+        buckets[cur].forEach(a=> { if (rate) chaosValues.push(a * rate) })
+      })
     }
-    const min = sorted[0]
-    const max = sorted[sorted.length-1]
-    const median = sorted[Math.floor(sorted.length/2)]
-    const avg = sorted.reduce((a,b)=>a+b,0)/sorted.length
-    const trimmedAvg = trimmed.reduce((a,b)=>a+b,0)/trimmed.length
-    // Suggested = median (robust), but if trimmed average within 5% of median use trimmed average (smoother)
-    const suggested = Math.abs(trimmedAvg-median)/Math.max(1,median) < 0.05 ? trimmedAvg : median
-    const spread = max===0?0: (max-min)/Math.max(1,(max+min)/2)
-    const qtyScore = Math.min(1, priced.length/40)
-    const spreadScore = spread>1?0: 1-spread
-    const confidence = Math.round((0.55*qtyScore + 0.45*spreadScore)*100)
-    setPriceSummary({ min, max, median, average:avg, trimmedAverage:trimmedAvg, suggested, count:priced.length, confidence })
+    chaosValues = chaosValues.filter(v=> v>0 && isFinite(v))
+    if (!chaosValues.length) { setPriceSummary(null); return }
+    chaosValues.sort((a,b)=> a-b)
+    const n = chaosValues.length
+    // Compute quartiles
+    const q = (p:number)=> { if (!n) return 0; const idx = (n-1)*p; const lo = Math.floor(idx); const hi=Math.ceil(idx); if (lo===hi) return chaosValues[lo]; const w=idx-lo; return chaosValues[lo]*(1-w)+chaosValues[hi]*w }
+    const q1 = q(0.25); const q2 = q(0.5); const q3 = q(0.75)
+    const iqr = q3 - q1
+    // Remove Tukey outliers
+    let filtered = chaosValues.filter(v=> v >= (q1 - 1.5*iqr) && v <= (q3 + 1.5*iqr))
+    if (filtered.length < Math.min(5, n*0.6)) { // fallback if over-trimmed
+      filtered = chaosValues.slice()
+    }
+    const m = filtered.length
+    // Percentile helper on filtered
+    const fq = (p:number)=> { if(!m) return 0; const idx=(m-1)*p; const lo=Math.floor(idx); const hi=Math.ceil(idx); if(lo===hi) return filtered[lo]; const w=idx-lo; return filtered[lo]*(1-w)+filtered[hi]*w }
+    const minP = fq(Math.min(0.18, Math.max(0.1, 3/m))) // adaptive lower bound
+    const maxP = fq(Math.max(0.82, 1-Math.max(0.1, 3/m)))
+    const median = fq(0.5)
+    const average = filtered.reduce((a,b)=>a+b,0)/m
+    const trimmedAverage = (()=>{ const cut = Math.floor(m*0.1); if (m>=10) { const arr = filtered.slice(cut, m-cut); return arr.reduce((a,b)=>a+b,0)/arr.length } return average })()
+    const dispersion = median ? (q3 - q1)/median : 0
+    // Suggested: lean toward median unless distribution tight
+    let suggested = median
+    const relDiff = Math.abs(trimmedAverage - median)/Math.max(1, median)
+    if (relDiff < 0.07) suggested = (median*0.4 + trimmedAverage*0.6) // smoothing
+    // Confidence: sample size + inverse dispersion
+    const sampleScore = Math.min(1, Math.log2(m+1)/5) // 5 => near 1
+    const dispersionScore = Math.max(0, Math.min(1, 1 - dispersion/1.4))
+    const confidence = Math.round((0.6*sampleScore + 0.4*dispersionScore)*100)
+
+    // Auto currency conversion similar to awakened-poe-trade
+    const toDisplay = (chaos:number): { amount:number; currency:'chaos'|'div' } => {
+      if (!divineRate) return { amount: chaos, currency: 'chaos' }
+      if (chaos > (divineRate * 0.94)) {
+        // Near or above divine pricing threshold
+        if (chaos < divineRate * 1.06) {
+          return { amount: 1, currency: 'div' }
+        } else {
+          return { amount: chaos / divineRate, currency: 'div' }
+        }
+      }
+      return { amount: chaos, currency: 'chaos' }
+    }
+
+    // Quick sell vs fair price strategy:
+    // If confidence low or dispersion high, quick sell undercuts more.
+    const dispersionFactor = Math.min(0.15, Math.max(0.05, dispersion * 0.4))
+    const baseDiscount = (confidence < 50 ? 0.12 : confidence < 70 ? 0.09 : 0.07)
+    const adaptiveDiscount = Math.max(baseDiscount, dispersionFactor)
+    const quickSellChaos = suggested * (1 - adaptiveDiscount)
+    const fairChaos = suggested
+    const suggestedChaos = suggested // keep base
+
+    setPriceSummary({
+      min: minP,
+      max: maxP,
+      median,
+      average,
+      trimmedAverage,
+      suggestedChaos,
+      suggested: toDisplay(suggestedChaos),
+      quickSell: toDisplay(quickSellChaos),
+      fairPrice: toDisplay(fairChaos),
+  quickSellChaos,
+  fairPriceChaos: fairChaos,
+      count: m,
+      confidence,
+      originalCount: n,
+      removed: n - m,
+      divRate: divineRate
+    })
   }
 
   const formatPrice = (price: any) => {
-    if (!price) return "Not priced"
-    return `${price.amount} ${price.currency}`
+    if (!price) return 'Not priced'
+    const divRate = priceSummary?.divRate || null
+    const cur = String(price.currency || '').toLowerCase()
+    let chaosValue: number | undefined
+    if (cur.includes('chaos') || cur==='c') chaosValue = price.amount
+    else if (divRate && (cur.includes('div'))) chaosValue = price.amount * divRate
+    if (chaosValue === undefined) return `${price.amount} ${price.currency}`
+    if (priceDisplayMode === 'chaos') return `${chaosValue.toFixed(2)} c`
+    if (priceDisplayMode === 'equiv') {
+      if (divRate && chaosValue > divRate * 0.94) return `${chaosValue.toFixed(1)} c (${(chaosValue/divRate).toFixed(2)} div)`
+      return `${chaosValue.toFixed(2)} c`
+    }
+    if (divRate && chaosValue > divRate * 0.94) {
+      if (chaosValue < divRate * 1.06) return '1 div'
+      return `${(chaosValue/divRate).toFixed(2)} div`
+    }
+    return `${chaosValue.toFixed(2)} c`
   }
 
-  const getRarityColor = (rarity: string) => {
-    switch (rarity.toLowerCase()) {
-      case "normal":
-        return "color: #c8c8c8"
-      case "magic":
-        return "color: #8888ff"
-      case "rare":
-        return "color: #ffff77"
-      case "unique":
-        return "color: #af6025"
-      default:
-        return "color: #c8c8c8"
+  const displayChaosValue = (chaos:number) => {
+    const divRate = priceSummary?.divRate || null
+    if (priceDisplayMode === 'chaos') return `${chaos.toFixed(1)} c`
+    if (priceDisplayMode === 'equiv') {
+      if (divRate && chaos > divRate * 0.94) return `${chaos.toFixed(1)} c (${(chaos/divRate).toFixed(2)} div)`
+      return `${chaos.toFixed(1)} c`
     }
+    if (divRate && chaos > divRate * 0.94) {
+      if (chaos < divRate * 1.06) return '1 div'
+      return `${(chaos/divRate).toFixed(2)} div`
+    }
+    return `${chaos.toFixed(1)} c`
   }
 
   const formatTimeAgo = (dateString: string) => {
@@ -263,8 +1031,6 @@ export function ItemPriceChecker() {
     return `${diffDays}d ago`
   }
 
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const toggle = (id: string) => setExpanded(prev=> ({...prev, [id]: !prev[id]}))
 
   return (
     <div>
@@ -274,194 +1040,377 @@ export function ItemPriceChecker() {
           <button className={mode==='simple'? 'active':''} onClick={()=>persistMode('simple')}>Simple Name</button>
         </div>
         <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
-          <select value={selectedLeague} onChange={e=>setSelectedLeague(e.target.value)} style={{background:'#1e1e1e',border:'1px solid #333',color:'#ddd',padding:'6px 10px',borderRadius:4,fontSize:12}}>
-            {/* Basic league list; could be dynamic */}
-            <option value="Mercenaries">Mercenaries</option>
-            <option value="Hardcore Mercenaries">Hardcore Mercenaries</option>
-            <option value="Standard">Standard</option>
-            <option value="Hardcore">Hardcore</option>
-          </select>
+          <div style={{padding:'4px 10px',borderRadius:10,background:'linear-gradient(#222,#181818)',color:'#ddd',fontSize:12}}>League: {selectedLeague}</div>
         </div>
       </div>
 
       {mode==='clipboard' && (
-        <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:16}}>
-          <textarea
-            placeholder="Paste full item text from game (Ctrl+C on item)"
-            value={rawClipboard}
-            onChange={e=> setRawClipboard(e.target.value)}
-            style={{width:'100%',minHeight:260,background:'#111',border:'1px solid #333',color:'#ddd',padding:12,fontFamily:'Consolas, monospace',fontSize:12,borderRadius:6,resize:'vertical'}}
-          />
-          <div style={{display:'flex',gap:12,alignItems:'center'}}>
-            <button onClick={handleSearch} disabled={loading || !rawClipboard.trim()} className="btn btn-accent">{loading? 'Pricing…':'Price It'}</button>
-            {priceSummary && <div style={{fontSize:12,opacity:.7}}>Listings: {priceSummary.count} • Suggested: {priceSummary.suggested.toFixed(1)}c • Med {priceSummary.median.toFixed(1)} • Avg {priceSummary.average.toFixed(1)} • Conf {priceSummary.confidence}%</div>}
-            {!priceSummary && poePriceResult && <div style={{fontSize:12,opacity:.7}}>PoePrice.info: {poePriceResult.min.toFixed(1)}-{poePriceResult.max.toFixed(1)} {poePriceResult.currency} • Conf {poePriceResult.confidence}%</div>}
-            {error && <div style={{fontSize:12,color:'#ff6a6a'}}>{error}</div>}
-            {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#67bfff',textDecoration:'none'}}>Open Trade ↗</a>}
+        <div style={{background:'#080808',border:'1px solid #232323',borderRadius:8,padding:12,marginBottom:16}}>
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            {/* Paste box + toolbar (matches poeprices query flow). The compact item preview is rendered to the right after the user submits. */}
+            <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+              <div style={{background:'#0b0b0b',border:'1px solid #222',padding:6,borderRadius:8,width:430}}>
+                <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+                  <select value={priceDisplayMode} onChange={e=> setPriceDisplayMode(e.target.value as any)} style={{background:'#1e1e1e',border:'1px solid #333',color:'#ddd',fontSize:12,padding:'4px 6px',borderRadius:6}}>
+                    <option value="chaos">Chaos</option>
+                    <option value="auto">Chaos/Div</option>
+                    <option value="equiv">Chaos ≡</option>
+                  </select>
+                  <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+                    <button onClick={handleSearch} disabled={loading || !rawClipboard.trim()} style={btnStylePrimary}>Submit</button>
+                    <button onClick={()=>{ setRawClipboard(''); setParsed(null); setStatFilters({}); setSearchResults([]); setPriceSummary(null); setError(null); setSearchPerformed(false); }} style={btnStyle}>Reset</button>
+                  </div>
+                </div>
+                <textarea
+                  placeholder="Paste item text here (Ctrl+C in game, then Ctrl+V)"
+                  value={rawClipboard}
+                  onChange={e=> setRawClipboard(e.target.value)}
+                  rows={5}
+                  style={{width:'100%',background:'#070707',border:'1px solid #111',color:'#ddd',padding:8,fontFamily:'Consolas, monospace',fontSize:12,borderRadius:6,resize:'vertical'}}
+                />
+                {parsed && (parsed.implicits?.length || parsed.explicits?.length) && (
+                  <div style={{marginTop:10,background:'#121212',border:'1px solid #262626',borderRadius:8,padding:'10px 12px 12px',fontSize:11,lineHeight:1.5,color:'#d0d0d0',fontFamily:'Consolas, monospace',position:'relative'}}>
+                    <div style={{display:'flex',alignItems:'center'}}>
+                      <div style={{fontSize:10,letterSpacing:.8,opacity:.65}}>ITEM MODIFIERS (Placeholders)</div>
+                      <div
+                        onMouseEnter={()=>setShowModHelp(true)}
+                        onMouseLeave={()=>setShowModHelp(false)}
+                        style={{marginLeft:'auto',cursor:'help',width:16,height:16,borderRadius:8,background:'#1e1e1e',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#7fb8ff',border:'1px solid #2f2f2f'}}
+                        aria-label="Explain modifiers"
+                      >i</div>
+                      {showModHelp && (
+                        <div style={{position:'absolute',top:30,right:8,zIndex:10,background:'#161616',border:'1px solid #2d2d2d',borderRadius:8,padding:'10px 12px',width:300,lineHeight:1.4,boxShadow:'0 4px 18px rgba(0,0,0,.6)'}}>
+                          <div style={{fontSize:11,color:'#d8d8d8'}}>
+                            <b>What are these?</b><br/>
+                            Each line is an item modifier with numbers replaced by <b>#</b> (and <b>#%</b>) so you can focus on the pattern, not exact roll.<br/><br/>
+                            <b>Prefixes vs Suffixes</b><br/>
+                            Prefixes usually give core defenses, attributes, life, mana or ES. Suffixes tend to supply damage, speed, crit or resistances. We infer this heuristically – actual crafting tags can differ.<br/><br/>
+                            <b>Why show them?</b><br/>
+                            Helps you quickly judge: remaining crafting potential, distribution of defensive vs offensive stats, and which pseudo totals (resists / attributes / ES) influenced pricing.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {parsed.implicits?.length>0 && (
+                      <div style={{marginTop:6,marginBottom:8}}>
+                        <div style={{fontSize:10,letterSpacing:.5,opacity:.55,marginBottom:4}}>IMPLICITS</div>
+                        {parsed.implicits.map((m:string,i:number)=> (
+                          <div key={i} style={{color:'#b8a46a'}}>{normalizeModLine(m)}</div>
+                        ))}
+                        <div style={{height:1,background:'linear-gradient(90deg,#444,#222 70%)',margin:'8px 0 2px'}} />
+                      </div>
+                    )}
+                    {(() => {
+                      const explicits: string[] = parsed.explicits || []
+                      if (!explicits.length) return null
+                      const prefixKeywords = /(life|max life|mana|energy shield|armour|evasion|resistance|all attributes|strength|dexterity|intelligence|suppress|block|recovery)/i
+                      const suffixKeywords = /(attack speed|cast speed|critical|crit|damage|projectile|minion|penetration|spell damage|ailment|chaos damage|area of effect|duration)/i
+                      const prefixes: string[] = []
+                      const suffixes: string[] = []
+                      explicits.forEach(l=> {
+                        const low = l.toLowerCase()
+                        if (prefixKeywords.test(low) && !suffixKeywords.test(low)) prefixes.push(l)
+                        else if (suffixKeywords.test(low) && !prefixKeywords.test(low)) suffixes.push(l)
+                        else {
+                          if (/(life|resistance|energy shield|armour|evasion)/i.test(l)) { prefixes.push(l) } else { suffixes.push(l) }
+                        }
+                      })
+                      return (
+                        <div>
+                          <div style={{fontSize:10,letterSpacing:.5,opacity:.55,margin:'4px 0'}}>PREFIXES (heuristic)</div>
+                          {prefixes.length? prefixes.map((m,i)=>(<div key={i} style={{color:'#8ab4ff'}}>{normalizeModLine(m)}</div>)) : <div style={{opacity:.35}}>—</div>}
+                          <div style={{height:1,background:'linear-gradient(90deg,#333,#1c1c1c 70%)',margin:'8px 0 6px'}} />
+                          <div style={{fontSize:10,letterSpacing:.5,opacity:.55,margin:'4px 0'}}>SUFFIXES (heuristic)</div>
+                          {suffixes.length? suffixes.map((m,i)=>(<div key={i} style={{color:'#9fe3b4'}}>{normalizeModLine(m)}</div>)) : <div style={{opacity:.35}}>—</div>}
+                        </div>
+                      )
+                    })()}
+                    <div style={{marginTop:10,fontSize:10,opacity:.4}}>Numbers replaced with #; grouping is approximate for quick appraisal.</div>
+                  </div>
+                )}
+                {priceSummary && (
+                  <div style={{background:'#141414',border:'1px solid #2a2a2a',padding:'12px 14px',borderRadius:8,marginTop:12}}>
+                        <div style={{display:'flex',alignItems:'center',gap:18,flexWrap:'wrap'}}>
+                      <div style={{fontSize:13,letterSpacing:.5,opacity:.85}}>{priceDisplayMode==='chaos'? 'Estimated Price Range (Chaos)' : priceDisplayMode==='auto'? 'Estimated Price Range (Chaos / Div)' : 'Estimated Price Range (Chaos Equivalent)'}</div>
+                      <div style={{display:'flex',gap:14,fontSize:12}}>
+                        <div><span style={{opacity:.55}}>Min</span><div style={{fontWeight:600}}>{displayChaosValue(priceSummary.min)}</div></div>
+                        <div><span style={{opacity:.55}}>Median</span><div style={{fontWeight:600}}>{displayChaosValue(priceSummary.median)}</div></div>
+                        <div><span style={{opacity:.55}}>Avg</span><div style={{fontWeight:600}}>{displayChaosValue(priceSummary.average)}</div></div>
+                        <div><span style={{opacity:.55}}>Max</span><div style={{fontWeight:600}}>{displayChaosValue(priceSummary.max)}</div></div>
+                        <div><span style={{opacity:.55}}>Suggested</span><div style={{fontWeight:600,color:'#57d977'}}>{displayChaosValue(priceSummary.suggestedChaos)}</div></div>
+                        <div><span style={{opacity:.55}}>Quick Sell</span><div style={{fontWeight:600,color:'#ffb347'}}>{displayChaosValue(priceSummary.quickSellChaos || priceSummary.suggestedChaos)}</div></div>
+                        <div><span style={{opacity:.55}}>Fair</span><div style={{fontWeight:600,color:'#a0d8ff'}}>{displayChaosValue(priceSummary.fairPriceChaos || priceSummary.suggestedChaos)}</div></div>
+                        {poePriceResult && <div><span style={{opacity:.55}}>PoePrice</span><div style={{fontWeight:600,color:'#67bfff'}}>{displayChaosValue(poePriceResult.min)}-{displayChaosValue(poePriceResult.max)}</div></div>}
+                      </div>
+                      <div style={{marginLeft:'auto',fontSize:10,opacity:.5,display:'flex',gap:8,alignItems:'center'}}>
+                        <span>Heuristic • Conf {priceSummary.confidence}% • Trim {priceSummary.trimmedAverage.toFixed(1)} • Div≈{priceSummary.divRate? priceSummary.divRate.toFixed(1):'?' }c</span>
+                        {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:'#67bfff',textDecoration:'none'}}>Trade ↗</a>}
+                      </div>
+                    </div>
+                      {poePriceNote && (
+                        <div style={{fontSize:10,marginTop:4,color:'#999'}}>{poePriceNote}</div>
+                      )}
+                      {autoStrippedPseudos && (
+                        <div style={{fontSize:11,marginTop:4,color:'#57d977'}}>Broadened search automatically (combined stat totals had no direct matches).</div>
+                      )}
+                    <div style={{marginTop:8}}>
+                      <button onClick={()=>setShowExplain(s=>!s)} style={{background:'none',border:'none',color:'#6aa9ff',fontSize:11,cursor:'pointer',padding:0}}>{showExplain? 'Hide':'How was this priced?'}{showExplain? ' ▲':' ▼'}</button>
+                      {showExplain && (
+                        <div style={{marginTop:6,fontSize:11,lineHeight:1.4,color:'#ccc'}}>
+                          <div>We gathered <b>{priceSummary.originalCount}</b> recent listings matching your checked stats.</div>
+                          {priceSummary.removed>0 && (
+                            <div>Removed <b>{priceSummary.removed}</b> outlier price(s) using IQR (values far outside the central 50%).</div>
+                          )}
+                          <div><b>Median</b> ({priceSummary.median.toFixed(1)}c) is the middle chaos value; <b>Avg</b> is the simple mean ({priceSummary.average.toFixed(1)}c).</div>
+                          <div>We also compute a <b>trimmed avg</b> ({priceSummary.trimmedAverage.toFixed(1)}c) after dropping 10% high/low when enough data.</div>
+                          <div><b>Suggested</b> blends median & trimmed avg if close. <b>Quick Sell</b> undercuts by an adaptive {(() => {
+                            // Compute undercut percent relative to suggestedChaos baseline.
+                            if (!priceSummary) return '?'
+                            const chaosValueQuick = priceSummary.quickSell.currency === 'div' && priceSummary.divRate ? priceSummary.quickSell.amount * priceSummary.divRate : priceSummary.quickSell.amount
+                            const pct = 1 - (chaosValueQuick / priceSummary.suggestedChaos)
+                            return (pct*100).toFixed(1)
+                          })()}% for faster sale.</div>
+                          <div><b>Confidence {priceSummary.confidence}%</b> grows with more samples and tighter spread. Divine conversion shown when near/above ~1 divine.</div>
+                          <div style={{opacity:.7}}>Uncheck stats to broaden the pool; re-check to narrow it.</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {/* {exactPrice && (
+                  <div style={{marginTop:12,background:'#0f1112',border:'1px solid #2b2b2b',padding:10,borderRadius:8}}>
+                    <div style={{display:'flex',alignItems:'center'}}>
+                      <div style={{fontSize:11,opacity:.6,marginRight:12}}>Suggested</div>
+                      <div style={{fontSize:16,fontWeight:700,color:'#57d977'}}>{exactPrice.average.toFixed(1)} {exactPrice.currency}</div>
+                      <div style={{marginLeft:'auto',fontSize:10,opacity:.55}}>Live listing average</div>
+                    </div>
+                  </div>
+                )} */}
+
+
+                  {/* Listings table */}
+                  {(!noFilterMatch ? searchResults : lastSuccessfulResults).length>0 && (
+                    <div style={{marginTop:16}}>
+                      <div style={{display:'flex',alignItems:'center',gap:16,fontSize:12,opacity:.8,marginBottom:6}}>
+                        <div>Matched: {noFilterMatch ? 0 : searchResults.length}</div>
+                        <div>•</div>
+                        <div>Online</div>
+                        <div style={{marginLeft:'auto'}}><a href="#" onClick={(e)=>e.preventDefault()} style={{color:'#67bfff',textDecoration:'none'}}>Trade ↗</a></div>
+                      </div>
+                      <div style={{background:'#0c0c0c',border:'1px solid #1a1a1a',borderRadius:6,overflow:'hidden'}}>
+                        <div style={{display:'grid',gridTemplateColumns:'120px 1fr',fontSize:11,background:'#111',padding:'6px 10px',color:'#bbb',letterSpacing:.5}}>
+                          <div style={{fontWeight:600}}>PRICE</div>
+                          <div style={{fontWeight:600}}>LISTED</div>
+                        </div>
+                        <div style={{maxHeight:260,overflowY:'auto'}}>
+                          {(noFilterMatch ? lastSuccessfulResults : searchResults).slice(0,40).map((it,idx)=> (
+                            <div key={it.id||idx} style={{display:'grid',gridTemplateColumns:'120px 1fr',padding:'6px 10px',fontSize:12,background: idx%2? '#0a0a0a':'transparent'}}>
+                              <div style={{whiteSpace:'nowrap'}}>{formatPrice(it.listing?.price)}</div>
+                              <div style={{opacity:.7}}>{formatTimeAgo(it.listing?.indexed||'')}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {noFilterMatch && (
+                        <div style={{marginTop:8,fontSize:11,opacity:.7}}>No listings match current filters; showing last results. Loosen thresholds or uncheck more stats.</div>
+                      )}
+                    </div>
+                  )}
+              </div>
+
+
+              {/* Right-side mod box + listings */}
+              {searchPerformed && parsed && (
+                <div style={{display:'flex',flexDirection:'column',gap:12,flex:1,maxWidth:760}}>
+                  {parsed && (
+                      <div style={{background:'#0b0b0b',border:'1px solid #232323',borderRadius:6,padding:12,color:'#ddd',marginTop:8}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12}}>
+                          <div style={{fontSize:12,letterSpacing:.6}}>
+                            <div style={{opacity:.7,fontSize:11}}>CATEGORY</div>
+                            <div style={{fontWeight:800,fontSize:13,marginTop:4}}>{parsed?.itemClass || parsed?.baseType || '—'}</div>
+                            {/* Rarity-colored name block */}
+                            {(() => {
+                              const rarity = (parsed?.rarity||'').toLowerCase()
+                              const colors:Record<string,string>={ normal:'#ffffff', magic:'#6aa9ff', rare:'#e6d56a', unique:'#af6025', currency:'#d8d8d8', gem:'#1ba29b' }
+                              const col = colors[rarity] || '#ddd'
+                              const nameLine = parsed?.name || parsed?.baseType || ''
+                              const baseLine = parsed?.baseType && parsed?.name && parsed?.name!==parsed?.baseType ? parsed?.baseType : ''
+                              return (
+                                <div style={{marginTop:6,lineHeight:1.15}}>
+                                  <div style={{fontSize:13,fontWeight:700,color:col}}>{nameLine}</div>
+                                  {baseLine && <div style={{fontSize:11,opacity:.75}}>{baseLine}</div>}
+                                </div>
+                              )
+                            })()}
+                          </div>
+                          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
+                            <div style={{fontSize:12,opacity:.65}}>{parsed?.corrupted ? 'Corrupted' : 'Not Corrupted'}</div>
+                            {searchPerformed && (
+                              <div>
+                                <button onClick={rerunSearchWithCurrentFilters} disabled={loading || !filtersDirty} style={{background: filtersDirty? 'linear-gradient(90deg,#7d531f,#b47a2d)':'#333',border:'1px solid #444',color:'#eee',padding:'4px 10px',borderRadius:14,fontSize:11,cursor: filtersDirty? 'pointer':'not-allowed'}}>
+                                  {loading? 'Running...' : filtersDirty? 'Re-run Search' : 'Up to date'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+                          {/* Sockets & Links pill */}
+                          <div style={{padding:'6px 8px',background:'#0c0c0c',border:'1px solid #1a1a1a',borderRadius:8,fontSize:12,display:'flex',alignItems:'center',gap:6}}>
+                            {(() => {
+                              const info:any = (parsed as any)?.socketInfo
+                              if (!parsed?.sockets) return <span>SOCKETS: —</span>
+                              const colorsInline = info?.socketGroups ? info.socketGroups.map((grp:string[],gi:number)=> (
+                                <span key={gi} style={{display:'inline-block',marginRight:gi<info.socketGroups.length-1?4:0}}>
+                                  {grp.map((c:string,i:number)=> {
+                                    const colorMap:Record<string,string>={R:'#ff5555',G:'#6aff6a',B:'#4aa8ff',W:'#ddd',A:'#9b65ff'}
+                                    return <span key={i} style={{color:colorMap[c]||'#ccc'}}>{c}{i<grp.length-1 && <span style={{color:'#555'}}>-</span>}</span>
+                                  })}
+                                </span>
+                              )) : parsed.sockets
+                              const linkLabel = info?.largestLink ? info.largestLink : (parsed.links || '-')
+                              return <>
+                                <span style={{opacity:.65}}>SOCKETS:</span> {colorsInline} <span style={{opacity:.4,marginLeft:6}}>L:{linkLabel}</span>
+                              </>
+                            })()}
+                          </div>
+                          <div style={{padding:'6px 8px',background:'#0c0c0c',border:'1px solid #1a1a1a',borderRadius:8,fontSize:12}}>ITEM LEVEL: {parsed?.itemLevel || '—'}</div>
+                          <div style={{padding:'6px 8px',background:'#0c0c0c',border:'1px solid #1a1a1a',borderRadius:8,fontSize:12}}>
+                            {Object.values(statFilters).filter(st=> st.enabled).length} of {Object.keys(statFilters).length} STATS
+                          </div>
+                        </div>
+
+                        {/* Pseudo mods section */}
+                        {pseudoMods.length>0 && (
+                          <div style={{marginTop:14,marginBottom:6,borderTop:'1px solid #222',paddingTop:10,display:'flex',flexDirection:'column',gap:4}}>
+                            {pseudoMods.map(pm=> (
+                                  <div key={pm.id} style={{padding:'6px 10px',background:'#060606',border:'1px solid #141414',borderRadius:6,display:'flex',alignItems:'center',gap:10}}>
+                                    <input type="checkbox" defaultChecked onChange={(e)=>{
+                                      // When unchecked, remove its contribution by disabling related base stats heuristically (not stored separately yet)
+                                      if (!e.target.checked) {
+                                        // For now nothing else: future improvement could mark a separate pseudoFilters state
+                                      }
+                                    }} style={{marginTop:0}} />
+                                    <div style={{flex:1,fontSize:12,color:'#deb76c'}}>{pm.text}</div>
+                                    <div style={{display:'flex',gap:6}}>
+                                      <input defaultValue={pm.value} style={{width:60,background:'#0c0c0c',border:'1px solid #222',color:'#ddd',padding:'4px 6px',borderRadius:4,fontSize:12,textAlign:'center'}} />
+                                      <input placeholder="max" style={{width:56,background:'#0c0c0c',border:'1px solid #222',color:'#ddd',padding:'4px 6px',borderRadius:4,fontSize:12,textAlign:'center'}} />
+                                    </div>
+                                  </div>
+                                ))}
+                            <div style={{height:1,background:'#222',margin:'8px 0 4px'}} />
+                          </div>
+                        )}
+
+                        <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:4}}>
+                          {Object.keys(statFilters).length ? (
+                            Object.entries(statFilters)
+                              .filter(([id,st])=> !(hideCrafted && /crafted/i.test(String(st.text || ''))))
+                              .slice(0,9)
+                              .map(([id,st],idx)=>{
+                                const raw = st.text || ((parsed?.implicits||[]).concat(parsed?.explicits||[]))[idx] || ''
+                                const isImplicit = st.source==='implicit' || idx < (parsed?.implicits?.length||0)
+                                const nums = (raw.match(/[-+]?[0-9]+(?:\.[0-9]+)?/g) || []).map((n:string)=>Number(n))
+                                const minNum = nums.length? Math.min(...nums): undefined
+                                const maxNum = nums.length? Math.max(...nums): undefined
+                                const currentVal = st.min ? Number(st.min) : (maxNum || '')
+                                const pct = (minNum!==undefined && maxNum!==undefined && currentVal!==undefined && typeof currentVal==='number') ? ((currentVal - minNum)/(Math.max(1,(maxNum-minNum))) ) : 0.5
+                                return (
+                                  <div key={id} style={{padding:'8px 10px 10px',background:'#070707',border:'1px solid #141414',borderRadius:6}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                                      <input type="checkbox" checked={st.enabled} onChange={(e)=> setStatFilters(prev=> ({...prev,[id]:{...st,enabled:e.target.checked}}))} />
+                                      <div style={{flex:1}}>
+                                        <div style={{fontSize:13,fontWeight:600,color: isImplicit ? '#88aaff' : '#ffff77'}}>{raw}</div>
+                                      </div>
+                                      <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                        <input
+                                          value={st.quality}
+                                          onChange={(e)=> setStatFilters(prev=> ({...prev,[id]:{...st,quality:e.target.value}}))}
+                                          placeholder="Q %"
+                                          style={{width:50,background:'#0c0c0c',border:'1px solid #222',color:'#ddd',padding:'4px 4px',borderRadius:4,fontSize:12,textAlign:'center'}}
+                                        />
+                                        <input
+                                          value={st.min}
+                                          onChange={(e)=> setStatFilters(prev=> ({...prev,[id]:{...st,min:e.target.value}}))}
+                                          placeholder={minNum!==undefined? String(minNum): 'min'}
+                                          style={{width:56,background:'#0c0c0c',border:'1px solid #222',color:'#ddd',padding:'4px 6px',borderRadius:4,fontSize:12,textAlign:'center'}}
+                                        />
+                                        <input
+                                          value={st.max}
+                                          onChange={(e)=> setStatFilters(prev=> ({...prev,[id]:{...st,max:e.target.value}}))}
+                                          placeholder="Max"
+                                          style={{width:56,background:'#0c0c0c',border:'1px solid #222',color:'#ddd',padding:'4px 6px',borderRadius:4,fontSize:12,textAlign:'center'}}
+                                        />
+                                      </div>
+                                    </div>
+                                    <div style={{marginTop:6,position:'relative',height:18}}>
+                                      <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center'}}>
+                                        <div style={{flex:1,height:4,background:'linear-gradient(90deg,#222,#111)'}}>
+                                          <div style={{height:4,background:'#5c9ded',width:`${Math.min(100,Math.max(0,pct*100))}%`}} />
+                                        </div>
+                                      </div>
+                                      <div style={{position:'absolute',top:10,left:0,fontSize:10,opacity:.6}}>{minNum!==undefined? minNum: ''}</div>
+                                      <div style={{position:'absolute',top:10,right:0,fontSize:10,opacity:.6}}>{maxNum!==undefined? maxNum: ''}</div>
+                                    </div>
+                                  </div>
+                                )
+                              })
+                          ) : (
+                            <div style={{fontSize:12,opacity:.7}}>No mods to preview</div>
+                          )}
+                        </div>
+
+                        {/* Control bar removed per request */}
+                      </div>
+                  )}
+
+                </div>
+              )}
+                {approximateResults && !autoStrippedPseudos && (
+                  <div style={{marginTop:8,fontSize:11,opacity:.75,color:'#d8d8d8'}}>Approximate fallback: strict filters had zero matches; displaying nearest recent listings.</div>
+                )}
+            </div>
           </div>
-          {parsed && (
-            <div style={{display:'flex',flexWrap:'wrap',gap:18,fontSize:12,background:'#161616',border:'1px solid #262626',padding:'10px 14px',borderRadius:6}}>
-              <div><span style={{opacity:.55}}>Rarity</span><div>{parsed.rarity||'?'}</div></div>
-              <div><span style={{opacity:.55}}>Base</span><div>{parsed.baseType||'?'}</div></div>
-              {parsed.energyShield && <div><span style={{opacity:.55}}>ES</span><div>{parsed.energyShield}</div></div>}
-              {parsed.armour && <div><span style={{opacity:.55}}>Armour</span><div>{parsed.armour}</div></div>}
-              {parsed.evasion && <div><span style={{opacity:.55}}>Evasion</span><div>{parsed.evasion}</div></div>}
-              {parsed.quality && <div><span style={{opacity:.55}}>Quality</span><div>+{parsed.quality}%</div></div>}
-              {parsed.links && <div><span style={{opacity:.55}}>Links</span><div>{parsed.links}</div></div>}
-              {parsed.itemLevel && <div><span style={{opacity:.55}}>iLvl</span><div>{parsed.itemLevel}</div></div>}
-              {parsed.influences?.length>0 && <div><span style={{opacity:.55}}>Influences</span><div>{parsed.influences.join(', ')}</div></div>}
-            </div>
-          )}
-          {priceSummary && (
-            <div style={{background:'#141414',border:'1px solid #2a2a2a',padding:'16px 18px',borderRadius:8}}>
-              <div style={{display:'flex',alignItems:'center',gap:24,flexWrap:'wrap'}}>
-                <div style={{fontSize:13,letterSpacing:.5,opacity:.85}}>Estimated Price Range (chaos)</div>
-                <div style={{display:'flex',gap:16,fontSize:13}}>
-                  <div><span style={{opacity:.55}}>Min</span><div style={{fontWeight:600}}>{priceSummary.min.toFixed(1)}</div></div>
-                  <div><span style={{opacity:.55}}>Median</span><div style={{fontWeight:600}}>{priceSummary.median.toFixed(1)}</div></div>
-                  <div><span style={{opacity:.55}}>Avg</span><div style={{fontWeight:600}}>{priceSummary.average.toFixed(1)}</div></div>
-                  <div><span style={{opacity:.55}}>Max</span><div style={{fontWeight:600}}>{priceSummary.max.toFixed(1)}</div></div>
-                  <div><span style={{opacity:.55}}>Suggested</span><div style={{fontWeight:600,color:'#57d977'}}>{priceSummary.suggested.toFixed(1)}c</div></div>
-                  {poePriceResult && <div><span style={{opacity:.55}}>PoePrice</span><div style={{fontWeight:600,color:'#67bfff'}}>{poePriceResult.min.toFixed(1)}-{poePriceResult.max.toFixed(1)}{poePriceResult.currency}</div></div>}
-                </div>
-                <div style={{marginLeft:'auto',fontSize:11,opacity:.5,display:'flex',gap:12,alignItems:'center'}}>
-                  <span>Heuristic • Conf {priceSummary.confidence}% • Trim {priceSummary.trimmedAverage.toFixed(1)}</span>
-                  {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#67bfff',textDecoration:'none'}}>Trade ↗</a>}
-                </div>
-              </div>
-            </div>
-          )}
-          {!priceSummary && poePriceResult && (
-            <div style={{background:'#141414',border:'1px solid #2a2a2a',padding:'16px 18px',borderRadius:8,marginTop:12}}>
-              <div style={{display:'flex',alignItems:'center',gap:24,flexWrap:'wrap'}}>
-                <div style={{fontSize:13,letterSpacing:.5,opacity:.85}}>PoePrice.info Estimate ({poePriceResult.currency})</div>
-                <div style={{display:'flex',gap:16,fontSize:13}}>
-                  <div><span style={{opacity:.55}}>Min</span><div style={{fontWeight:600}}>{poePriceResult.min.toFixed(1)}</div></div>
-                  <div><span style={{opacity:.55}}>Max</span><div style={{fontWeight:600}}>{poePriceResult.max.toFixed(1)}</div></div>
-                  <div><span style={{opacity:.55}}>Suggested</span><div style={{fontWeight:600,color:'#57d977'}}>{((poePriceResult.min + poePriceResult.max)/2).toFixed(1)} {poePriceResult.currency}</div></div>
-                </div>
-                <div style={{marginLeft:'auto',fontSize:11,opacity:.5}}>
-                  <span>ML-based • Conf {poePriceResult.confidence}%</span>
-                  <div style={{fontSize:10,marginTop:4}}>Data provided by poeprices.info</div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
       {mode==='simple' && (
-        <div className="flex gap-2 mb-4 items-center">
-          <div className="search-container flex-1">
-            <div className="search-icon">🔍</div>
-            <input
-              type="text"
-              placeholder="Search items (e.g. Mageblood, Headhunter)"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={handleKeyPress}
-              className="search-input"
-            />
+        <div style={{background:'#080808',border:'1px solid #232323',borderRadius:8,padding:12,marginBottom:16}}>
+          <div style={{display:'flex',gap:12,alignItems:'center'}}>
+            <div className="search-container flex-1">
+              <div className="search-icon">🔍</div>
+              <input
+                    type="text"
+                    placeholder="Search items (e.g. Mageblood, Headhunter)"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    className="search-input"
+                    style={{background:'#0c0c0c',border:'1px solid #222',color:'#ddd',padding:6,borderRadius:6,width:'100%'}}
+                  />
+            </div>
           </div>
-          <button onClick={handleSearch} disabled={loading || !searchTerm.trim()} className="btn btn-accent">
-            {loading ? 'Searching…' : 'Search'}
-          </button>
-          {priceSummary && <div className="status status-connected">{priceSummary.count} priced • Avg {priceSummary.average.toFixed(1)}c</div>}
-          {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#67bfff',textDecoration:'none'}}>Open Trade ↗</a>}
+          <div style={{display:'flex',justifyContent:'center',marginTop:12}}>
+            <button onClick={handleSearch} disabled={loading || !searchTerm.trim()} style={btnStylePrimary}>
+              {loading ? 'Searching…' : 'Search'}
+            </button>
+          </div>
+          <div style={{marginTop:10,display:'flex',justifyContent:'center',gap:12}}>
+            {priceSummary && <div style={{fontSize:12,opacity:.8}}>{priceSummary.count} priced • Avg {priceSummary.average.toFixed(1)}c</div>}
+            {tradeSearchId && <a href={`https://www.pathofexile.com/trade/search/${encodeURIComponent(selectedLeague)}/${tradeSearchId}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#67bfff',textDecoration:'none'}}>Open Trade ↗</a>}
+          </div>
         </div>
       )}
 
       {loading && (
         <div className="loading"><div className="spinner" /> {mode==='clipboard'? 'Pricing item...' : 'Searching items...'}</div>
       )}
+  {/* Removed large results table */}
 
-  {!loading && searchResults.length>0 && (
-        <div className="table-container">
-          <table className="table">
-            <thead>
-              <tr>
-                <th style={{minWidth:260}}>Item</th>
-                <th style={{width:120}}>Price</th>
-                <th style={{width:140}}>Seller</th>
-                <th style={{width:90}}>Indexed</th>
-                <th style={{width:110}}>Copy Whisper</th>
-              </tr>
-            </thead>
-            <tbody>
-              {searchResults.map(item => {
-                const id = item.id
-                const isOpen = !!expanded[id]
-                const rarityStyle = getRarityColor(item.item.rarity)
-                return (
-                  <>
-                    <tr key={id} className={isOpen? 'row-open': ''}>
-                      <td>
-                        <div style={{display:'flex',alignItems:'center',gap:10}}>
-                          <img src={item.item.icon} alt="" style={{width:40,height:40,objectFit:'contain'}} />
-                          <div style={{display:'flex',flexDirection:'column'}}>
-                            <span style={rarityStyle as any}>{item.item.name || item.item.typeLine}</span>
-                            {item.item.name && item.item.typeLine && <span style={{fontSize:11,opacity:.6}}>{item.item.typeLine}</span>}
-                          </div>
-                          <button onClick={()=>toggle(id)} style={{marginLeft:'auto',background:'none',border:'1px solid #333',color:'#bbb',fontSize:11,padding:'2px 6px',borderRadius:4,cursor:'pointer'}}>{isOpen? 'Hide' : 'Details'}</button>
-                        </div>
-                      </td>
-                      <td style={{fontWeight:600}}>{formatPrice(item.listing.price)}</td>
-                      <td style={{fontSize:12}}>
-                        <div style={{display:'flex',flexDirection:'column',gap:2}}>
-                          <span>{item.listing.account.name}</span>
-                          {item.listing.account.online && <span style={{color:'#4ade80',fontSize:11}}>Online</span>}
-                        </div>
-                      </td>
-                      <td style={{fontSize:12}}>{formatTimeAgo(item.listing.indexed)}</td>
-                      <td>
-                        <button
-                          className="btn btn-sm"
-                          onClick={()=>navigator.clipboard.writeText(item.listing.whisper)}
-                          title="Copy whisper to clipboard"
-                        >Copy</button>
-                      </td>
-                    </tr>
-                    {isOpen && (
-                      <tr key={id+':details'} style={{background:'#1b1b1b'}}>
-                        <td colSpan={5} style={{padding:'12px 18px'}}>
-                          <div style={{display:'flex',flexWrap:'wrap',gap:32}}>
-                            {item.item.properties && item.item.properties.length>0 && (
-                              <div style={{minWidth:200}}>
-                                <div style={{fontSize:12,letterSpacing:.5,opacity:.7,marginBottom:4}}>Properties</div>
-                                {item.item.properties.map((p,i)=>(
-                                  <div key={i} style={{fontSize:12}}>
-                                    <span style={{opacity:.8}}>{p.name}:</span> {p.values.map(([v])=>v).join(', ')}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {(item.item.implicitMods || item.item.explicitMods) && (
-                              <div style={{minWidth:260}}>
-                                {item.item.implicitMods && (
-                                  <div style={{marginBottom:8}}>
-                                    <div style={{fontSize:12,letterSpacing:.5,opacity:.7,marginBottom:4}}>Implicit Mods</div>
-                                    {item.item.implicitMods.map((m,i)=>(<div key={i} style={{fontSize:12,color:'#8888ff'}}>{m}</div>))}
-                                  </div>
-                                )}
-                                {item.item.explicitMods && (
-                                  <div>
-                                    <div style={{fontSize:12,letterSpacing:.5,opacity:.7,marginBottom:4}}>Explicit Mods</div>
-                                    {item.item.explicitMods.map((m,i)=>(<div key={i} style={{fontSize:12,color:'#ffff77'}}>{m}</div>))}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+  {!loading && searchPerformed && searchResults.length===0 && (
+    <div style={{padding:12,opacity:.7}}>No listings matched your filters.</div>
+  )}
 
       {!loading && mode==='simple' && searchResults.length === 0 && searchTerm && (
         <div className="card text-center">
