@@ -171,7 +171,7 @@ export function TopNav() {
                 if (!document.hidden) {
                   window.open(webLink, '_blank', 'noopener,noreferrer')
                 }
-              }, 1200)
+              }, 900)
             }}
             style={btnStyle}
             title="Open Telegram"
