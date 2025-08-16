@@ -44,7 +44,14 @@ export function AuthStatus() {
   const handleLogin = async () => {
     try {
       const authUrl = await poeApi.getAuthUrl()
-      window.location.href = authUrl
+      if (authUrl) {
+        window.location.href = authUrl
+      } else {
+        // Popup handled authentication; refresh local state
+        const prof = await poeApi.getProfile(true)
+        if (prof?.name) setAccountName(prof.name)
+        setIsAuthenticated(poeApi.isAuthenticated())
+      }
     } catch (error) {
       console.error("Error generating auth URL:", error)
     }

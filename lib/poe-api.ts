@@ -285,7 +285,21 @@ private oauthConfig: OAuthConfig = {
       prompt: "consent",
     })
 
-    return `${this.oauthBaseUrl}/oauth/authorize?${params.toString()}`
+    const full = `${this.oauthBaseUrl}/oauth/authorize?${params.toString()}`
+    // If running inside Electron with popup helper, perform the flow immediately and exchange token
+    // This avoids navigation away & can bypass CF issues by isolating login window.
+    if (typeof window !== 'undefined' && (window as any).poeApp?.oauthOpen) {
+      try {
+        const result = await (window as any).poeApp.oauthOpen(full)
+        if (result && result.code && result.state) {
+          await this.exchangeCodeForToken(result.code, result.state)
+          return '' // indicates handled
+        }
+      } catch (e) {
+        console.warn('Electron oauth popup failed, falling back to redirect', (e as any)?.message)
+      }
+    }
+    return full
   }
 
   async exchangeCodeForToken(code: string, state: string): Promise<AuthToken> {
