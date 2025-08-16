@@ -68,7 +68,30 @@ export function SessionManager({ onSessionReady, isTradeEnabled, league }: Sessi
         return
       }
     }
-    setShowInstructions(true)
+    
+    // If no cookie found, try to get fresh session from server
+    tryRefreshSession()
+  }
+
+  const tryRefreshSession = async () => {
+    try {
+      const res = await fetch('/api/session/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ league })
+      })
+      
+      const result = await res.json()
+      if (result.success && result.sessionId) {
+        setSessionId(result.sessionId)
+        validateSession(result.sessionId)
+      } else {
+        setShowInstructions(true)
+      }
+    } catch (error) {
+      console.error('Failed to refresh session:', error)
+      setShowInstructions(true)
+    }
   }
 
   if (isTradeEnabled && validationResult?.valid) {
@@ -94,7 +117,10 @@ export function SessionManager({ onSessionReady, isTradeEnabled, league }: Sessi
         {!showInstructions ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <button 
-              onClick={() => window.open('https://www.pathofexile.com/trade', '_blank')}
+              onClick={() => {
+                const url = `https://www.pathofexile.com/trade/search/${encodeURIComponent(league)}`
+                window.open(url, '_blank')
+              }}
               className="btn btn-outline"
               style={{ padding: '0.75rem', width: '100%' }}
             >
@@ -167,6 +193,11 @@ export function SessionManager({ onSessionReady, isTradeEnabled, league }: Sessi
             }}
           >
             {validationResult.valid ? '✅' : '❌'} {validationResult.message}
+            {!validationResult.valid && (
+              <div style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                💡 <strong>Tip:</strong> Session may be expired. Try logging in again to get a fresh session ID.
+              </div>
+            )}
           </div>
         )}
       </div>
