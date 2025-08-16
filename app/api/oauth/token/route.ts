@@ -87,37 +87,108 @@ export async function POST(request: Request) {
       /<title>Attention Required! \| Cloudflare<\/title>/i.test(raw) || /cf-error-details/.test(raw) || /You are unable to access\s+pathofexile\.com/i.test(raw)
 
     for (const a of attempts) {
-      const form = buildForm(a.withSecret);
+      const form = buildForm(a.withSecret)
       console.log("[OAuth Token] Attempting token exchange:", {
         attempt: a.attempt,
         withSecret: a.withSecret,
-      });
-      let upstream: Response;
+        code_present: !!form.get("code"),
+        verifier_len: form.get("code_verifier")?.length,
+      })
+      let upstream: Response
       try {
         upstream = await fetch("https://www.pathofexile.com/oauth/token", {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
             Accept: "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            Referer: envRedirect,
+            Origin: new URL(envRedirect).origin,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) poetoybocs OAuth/1.0 Chrome/125 Safari/537.36",
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
           },
           body: form,
-        });
-        const responseText = await upstream.text();
-        console.log("[OAuth Token] Upstream response:", responseText);
-        if (!upstream.ok) {
-          console.error("[OAuth Token] Upstream error:", upstream.status, responseText);
-          continue;
+        })
+      } catch (e: any) {
+        console.error("[OAuth Token] Network error during attempt", { attempt: a.attempt, withSecret: a.withSecret, error: e?.message })
+        if (a.attempt === attempts.length) {
+          return Response.json(
+            { error: "network_error", error_description: e?.message || "Failed to contact token endpoint" },
+            { status: 502 },
+          )
         }
-        return new Response(responseText, {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-      } catch (err: any) {
-        console.error("[OAuth Token] Fetch error:", err);
-        continue;
+        continue
       }
+
+      let upstreamRaw = ""
+      try {
+        upstreamRaw = await upstream.text()
+      } catch (e: any) {
+        console.error("[OAuth Token] Failed reading upstream body", { attempt: a.attempt, error: e?.message })
+        if (a.attempt === attempts.length)
+          return Response.json(
+            { error: "upstream_body_error", error_description: e?.message || "Could not read upstream body" },
+            { status: 502 },
+          )
+        continue
+      }
+
+      console.log("[OAuth Token] Upstream response:", { status: upstream.status, bodyLength: upstreamRaw.length, bodyPreview: upstreamRaw.substring(0, 100) })
+
+      const cfBlocked = blockedDetector(upstreamRaw)
+      if (cfBlocked) {
+        const rayMatch = upstreamRaw.match(/Ray ID:\s*<strong[^>]*>([A-Za-z0-9]+)<\/strong>/i)
+        const ray = rayMatch?.[1]
+        console.warn("[OAuth Token] Cloudflare block detected", { attempt: a.attempt, withSecret: a.withSecret, ray })
+        if (a.attempt === attempts.length) {
+          return Response.json(
+            {
+              error: "cloudflare_blocked",
+              error_description: "Cloudflare blocked the OAuth token request after retries.",
+              ray,
+              status: upstream.status || 403,
+            },
+            { status: 403 },
+          )
+        }
+        // try next attempt (e.g., without secret)
+        continue
+      }
+
+      let upstreamJson: any = null
+      if (upstreamRaw) {
+        try { upstreamJson = JSON.parse(upstreamRaw) } catch { /* ignore non-json */ }
+      }
+
+      if (!upstream.ok) {
+        console.error("[OAuth Token] Token exchange failed", {
+          attempt: a.attempt,
+            status: upstream.status,
+          withSecret: a.withSecret,
+          bodyPreview: upstreamRaw.slice(0, 240),
+        })
+        return Response.json(
+          {
+            error: upstreamJson?.error || "token_exchange_failed",
+            error_description: upstreamJson?.error_description || upstreamRaw || "Unknown error",
+            status: upstream.status,
+            attempt: a.attempt,
+          },
+          { status: upstream.status },
+        )
+      }
+
+      if (!upstreamJson) {
+        console.warn("[OAuth Token] Success status but non-JSON", { attempt: a.attempt, preview: upstreamRaw.slice(0, 100) })
+        return Response.json(
+          { error: "invalid_upstream_format", error_description: "Expected JSON token payload" },
+          { status: 502 },
+        )
+      }
+
+      console.log("[OAuth Token] Token exchange success", { attempt: a.attempt })
+      return Response.json(upstreamJson)
     }
     // Should not reach here
     return Response.json(
