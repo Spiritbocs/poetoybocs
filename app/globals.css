@@ -354,6 +354,9 @@ body {
 .price-grid .wiki-badge { margin-right:4px; }
 .price-grid .num { font-variant-numeric: tabular-nums; font-weight:600; }
 
+/* Inline currency value + icon alignment */
+.currency-inline { display:inline-flex; align-items:center; gap:4px; }
+
 /* Enhanced sparkline */
 .sparkline-box { position:relative; display:inline-flex; }
 .sparkline-bg { fill:rgba(255,255,255,0.03); stroke:rgba(255,255,255,0.08); }

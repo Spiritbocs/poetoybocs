@@ -57,6 +57,13 @@ export function ItemPriceChecker() {
   const [showModHelp, setShowModHelp] = useState(false)
   // Display mode for prices: chaos only, auto chaos/divine, or chaos equivalent with both
   const [priceDisplayMode, setPriceDisplayMode] = useState<'chaos'|'auto'|'equiv'>('auto')
+  // Currency icons (align with currency tracker implementation)
+  const CHAOS_ICON_FALLBACK = "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lSZXJvbGxSYXJlIiwidyI6MSwiaCI6MSwic2NhbGUiOjF9XQ/d119a0d734/CurrencyRerollRare.png"
+  const [chaosIcon,setChaosIcon] = useState<string|null>(null)
+  const [divineIcon,setDivineIcon] = useState<string|null>(null)
+  const ICON_SIZE = 18
+  const iconStyle: React.CSSProperties = { width: ICON_SIZE, height: ICON_SIZE, objectFit:'contain', verticalAlign:'text-bottom' }
+  useEffect(()=>{ if(!selectedLeague) return; let cancelled=false; (async()=>{ try { const cur= await poeApi.getCurrencyData(selectedLeague,'Currency'); if(cancelled) return; const chaos=cur.find(c=>c.detailsId==='chaos-orb'); const div=cur.find(c=>c.detailsId==='divine-orb'); setChaosIcon(chaos?.icon || CHAOS_ICON_FALLBACK); if(div?.icon) setDivineIcon(div.icon) } catch { setChaosIcon(c=> c||CHAOS_ICON_FALLBACK) } })(); return ()=>{ cancelled=true } },[selectedLeague])
 
   // Per-stat quick filter state (initialized from parsed item lines)
   const [statFilters, setStatFilters] = useState<Record<string,{ enabled: boolean; min: string; max: string; quality: string; text?: string; source?: string }>>({})
@@ -991,32 +998,34 @@ export function ItemPriceChecker() {
     let chaosValue: number | undefined
     if (cur.includes('chaos') || cur==='c') chaosValue = price.amount
     else if (divRate && (cur.includes('div'))) chaosValue = price.amount * divRate
-    if (chaosValue === undefined) return `${price.amount} ${price.currency}`
-    if (priceDisplayMode === 'chaos') return `${chaosValue.toFixed(2)} c`
+    if (chaosValue === undefined) return (<span className="currency-inline">{price.amount} {price.currency}</span>)
+  if (priceDisplayMode === 'chaos') return <span className="currency-inline">{chaosValue.toFixed(2)} {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" style={iconStyle} onError={(e)=>{ if(e.currentTarget.src!==CHAOS_ICON_FALLBACK) e.currentTarget.src=CHAOS_ICON_FALLBACK }} />}</span>
     if (priceDisplayMode === 'equiv') {
-      if (divRate && chaosValue > divRate * 0.94) return `${chaosValue.toFixed(1)} c (${(chaosValue/divRate).toFixed(2)} div)`
-      return `${chaosValue.toFixed(2)} c`
+  if (divRate && chaosValue > divRate * 0.94) return <span className="currency-inline">{chaosValue.toFixed(1)} {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" style={iconStyle} onError={(e)=>{ if(e.currentTarget.src!==CHAOS_ICON_FALLBACK) e.currentTarget.src=CHAOS_ICON_FALLBACK }} />} (<span style={{display:'inline-flex',alignItems:'center',gap:2}}>{(chaosValue/divRate).toFixed(2)} {divineIcon && <img src={divineIcon} alt="Divine Orb" title="Divine Orb" style={iconStyle} />}</span>)</span>
+  return <span className="currency-inline">{chaosValue.toFixed(2)} {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" style={iconStyle} onError={(e)=>{ if(e.currentTarget.src!==CHAOS_ICON_FALLBACK) e.currentTarget.src=CHAOS_ICON_FALLBACK }} />}</span>
     }
     if (divRate && chaosValue > divRate * 0.94) {
-      if (chaosValue < divRate * 1.06) return '1 div'
-      return `${(chaosValue/divRate).toFixed(2)} div`
+  if (chaosValue < divRate * 1.06) return <span className="currency-inline">1 {divineIcon && <img src={divineIcon} alt="Divine Orb" title="Divine Orb" style={iconStyle} />}</span>
+  return <span className="currency-inline">{(chaosValue/divRate).toFixed(2)} {divineIcon && <img src={divineIcon} alt="Divine Orb" title="Divine Orb" style={iconStyle} />}</span>
     }
-    return `${chaosValue.toFixed(2)} c`
+  return <span className="currency-inline">{chaosValue.toFixed(2)} {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" style={iconStyle} onError={(e)=>{ if(e.currentTarget.src!==CHAOS_ICON_FALLBACK) e.currentTarget.src=CHAOS_ICON_FALLBACK }} />}</span>
   }
 
-  const displayChaosValue = (chaos:number) => {
+  const displayChaosValue = (chaos:number): React.ReactNode => {
     const divRate = priceSummary?.divRate || null
-    if (priceDisplayMode === 'chaos') return `${chaos.toFixed(1)} c`
+  if (priceDisplayMode === 'chaos') return <span className="currency-inline">{chaos.toFixed(1)} {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" style={iconStyle} onError={(e)=>{ if(e.currentTarget.src!==CHAOS_ICON_FALLBACK) e.currentTarget.src=CHAOS_ICON_FALLBACK }} />}</span>
     if (priceDisplayMode === 'equiv') {
-      if (divRate && chaos > divRate * 0.94) return `${chaos.toFixed(1)} c (${(chaos/divRate).toFixed(2)} div)`
-      return `${chaos.toFixed(1)} c`
+  if (divRate && chaos > divRate * 0.94) return <span className="currency-inline">{chaos.toFixed(1)} {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" style={iconStyle} onError={(e)=>{ if(e.currentTarget.src!==CHAOS_ICON_FALLBACK) e.currentTarget.src=CHAOS_ICON_FALLBACK }} />} (<span style={{display:'inline-flex',alignItems:'center',gap:2}}>{(chaos/divRate).toFixed(2)} {divineIcon && <img src={divineIcon} alt="Divine Orb" title="Divine Orb" style={iconStyle} />}</span>)</span>
+  return <span className="currency-inline">{chaos.toFixed(1)} {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" style={iconStyle} onError={(e)=>{ if(e.currentTarget.src!==CHAOS_ICON_FALLBACK) e.currentTarget.src=CHAOS_ICON_FALLBACK }} />}</span>
     }
     if (divRate && chaos > divRate * 0.94) {
-      if (chaos < divRate * 1.06) return '1 div'
-      return `${(chaos/divRate).toFixed(2)} div`
+  if (chaos < divRate * 1.06) return <span className="currency-inline">1 {divineIcon && <img src={divineIcon} alt="Divine Orb" title="Divine Orb" style={iconStyle} />}</span>
+  return <span className="currency-inline">{(chaos/divRate).toFixed(2)} {divineIcon && <img src={divineIcon} alt="Divine Orb" title="Divine Orb" style={iconStyle} />}</span>
     }
-    return `${chaos.toFixed(1)} c`
+  return <span className="currency-inline">{chaos.toFixed(1)} {chaosIcon && <img src={chaosIcon} alt="Chaos Orb" title="Chaos Orb" style={iconStyle} onError={(e)=>{ if(e.currentTarget.src!==CHAOS_ICON_FALLBACK) e.currentTarget.src=CHAOS_ICON_FALLBACK }} />}</span>
   }
+
+  // Removed inline SVG CurrencyIcon (using actual game asset icons like currency tracker)
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
@@ -1040,7 +1049,7 @@ export function ItemPriceChecker() {
           <button className={mode==='simple'? 'active':''} onClick={()=>persistMode('simple')}>Simple Name</button>
         </div>
         <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
-          <div style={{padding:'4px 10px',borderRadius:10,background:'linear-gradient(#222,#181818)',color:'#ddd',fontSize:12}}>League: {selectedLeague}</div>
+          {/* Removed league pill per user request */}
         </div>
       </div>
 
@@ -1133,7 +1142,7 @@ export function ItemPriceChecker() {
                   <div style={{background:'#141414',border:'1px solid #2a2a2a',padding:'12px 14px',borderRadius:8,marginTop:12}}>
                         <div style={{display:'flex',alignItems:'center',gap:18,flexWrap:'wrap'}}>
                       <div style={{fontSize:13,letterSpacing:.5,opacity:.85}}>{priceDisplayMode==='chaos'? 'Estimated Price Range (Chaos)' : priceDisplayMode==='auto'? 'Estimated Price Range (Chaos / Div)' : 'Estimated Price Range (Chaos Equivalent)'}</div>
-                      <div style={{display:'flex',gap:14,fontSize:12}}>
+                        <div style={{display:'flex',gap:14,fontSize:12}}>
                         <div><span style={{opacity:.55}}>Min</span><div style={{fontWeight:600}}>{displayChaosValue(priceSummary.min)}</div></div>
                         <div><span style={{opacity:.55}}>Median</span><div style={{fontWeight:600}}>{displayChaosValue(priceSummary.median)}</div></div>
                         <div><span style={{opacity:.55}}>Avg</span><div style={{fontWeight:600}}>{displayChaosValue(priceSummary.average)}</div></div>
@@ -1141,7 +1150,7 @@ export function ItemPriceChecker() {
                         <div><span style={{opacity:.55}}>Suggested</span><div style={{fontWeight:600,color:'#57d977'}}>{displayChaosValue(priceSummary.suggestedChaos)}</div></div>
                         <div><span style={{opacity:.55}}>Quick Sell</span><div style={{fontWeight:600,color:'#ffb347'}}>{displayChaosValue(priceSummary.quickSellChaos || priceSummary.suggestedChaos)}</div></div>
                         <div><span style={{opacity:.55}}>Fair</span><div style={{fontWeight:600,color:'#a0d8ff'}}>{displayChaosValue(priceSummary.fairPriceChaos || priceSummary.suggestedChaos)}</div></div>
-                        {poePriceResult && <div><span style={{opacity:.55}}>PoePrice</span><div style={{fontWeight:600,color:'#67bfff'}}>{displayChaosValue(poePriceResult.min)}-{displayChaosValue(poePriceResult.max)}</div></div>}
+                        {poePriceResult && <div><span style={{opacity:.55}}>PoePrice</span><div style={{fontWeight:600,color:'#67bfff'}}>{displayChaosValue(poePriceResult.min)} – {displayChaosValue(poePriceResult.max)}</div></div>}
                       </div>
                       <div style={{marginLeft:'auto',fontSize:10,opacity:.5,display:'flex',gap:8,alignItems:'center'}}>
                         <span>Heuristic • Conf {priceSummary.confidence}% • Trim {priceSummary.trimmedAverage.toFixed(1)} • Div≈{priceSummary.divRate? priceSummary.divRate.toFixed(1):'?' }c</span>
