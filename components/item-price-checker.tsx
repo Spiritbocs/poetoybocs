@@ -64,6 +64,8 @@ export function ItemPriceChecker() {
   const [poePriceResult, setPoePriceResult] = useState<{min: number; max: number; currency: string; confidence: number} | null>(null)
   const [poePriceLoading, setPoePriceLoading] = useState(false)
   const [poePriceNote, setPoePriceNote] = useState<string | null>(null)
+  // Fallback poe.ninja baseline when trade API blocked
+  const [fallbackPrice, setFallbackPrice] = useState<{ chaos:number; source:string; matched:string }|null>(null)
   const [lastQuery, setLastQuery] = useState<any | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [hideCrafted, setHideCrafted] = useState(true)
@@ -205,6 +207,46 @@ export function ItemPriceChecker() {
   // Mark filters dirty after initial parse only if a search already occurred
   setFiltersDirty(prev=> searchPerformed ? true : prev)
   }, [parsed])
+
+  // Infer a poe.ninja overview type for a parsed item (uniques only for now)
+  function inferNinjaType(p:any): string | null {
+    if (!p) return null
+    const rarity = (p.rarity||'').toLowerCase()
+    const base = (p.baseType||'').toLowerCase()
+    const name = (p.name||'').toLowerCase()
+    if (rarity === 'unique') {
+      if (/flask/.test(base)) return 'UniqueFlask'
+      if (/belt|ring|amulet/.test(base)) return 'UniqueAccessory'
+      if (/jewel/.test(base)) return 'UniqueJewel'
+      if (/relic/.test(base)) return 'UniqueRelic'
+      if (/tincture/.test(base)) return 'UniqueTincture'
+      if (/map/.test(base)) return 'UniqueMap'
+      if (/weapon|sword|axe|mace|bow|wand|staff|dagger|claw|rapier|foil|quiver|sceptre/.test(base) || /sword|axe|mace|bow|wand|staff|dagger|claw|rapier|foil|quiver/.test(name)) return 'UniqueWeapon'
+      if (/helmet|helm|gloves|boots|greaves|gauntlets|plate|armour|evasion|shield|buckler|kite|tower/.test(base)) return 'UniqueArmour'
+      return 'UniqueArmour'
+    }
+    return null
+  }
+
+  // Populate fallback price when we encounter a forbidden trade upstream (once per parsed item)
+  useEffect(()=>{ (async()=>{
+    if (!forbiddenMeta || fallbackPrice || !parsed) return
+    const t = inferNinjaType(parsed)
+    if (!t) return
+    try {
+      const lines = await poeApi.getItemOverview(selectedLeague, t)
+      if (Array.isArray(lines) && lines.length) {
+        const lower = (s:string)=> s.toLowerCase()
+        const targetName = lower(parsed.name||'')
+        const targetBase = lower(parsed.baseType||'')
+        let found = lines.find((l:any)=> lower(l.name||'') === targetName)
+        if (!found && targetBase) found = lines.find((l:any)=> lower(l.baseType||'') === targetBase)
+        if (found && typeof found.chaosValue === 'number') {
+          setFallbackPrice({ chaos: found.chaosValue, source: t, matched: found.name || found.baseType })
+        }
+      }
+    } catch {/* ignore */}
+  })() }, [forbiddenMeta, fallbackPrice, parsed, selectedLeague])
 
   // showFilters toggles the inline filter panel in the form
 
@@ -1190,6 +1232,11 @@ export function ItemPriceChecker() {
               <li>Implement an external proxy with caching & allow-list (optional).</li>
             </ul>
             Until resolved you can still paste items to get ML estimate from poeprices.info (if available) and manual valuation using poe.ninja reference values.
+            {fallbackPrice && (
+              <div style={{marginTop:8,padding:'6px 8px',background:'#442626',border:'1px solid #6d3a3a',borderRadius:6}}>
+                <strong>Fallback (poe.ninja)</strong>: ~{fallbackPrice.chaos.toFixed(1)} chaos (matched {fallbackPrice.matched} in {fallbackPrice.source})
+              </div>
+            )}
           </div>
           <button onClick={()=> setForbiddenMeta(null)} style={{marginTop:8,fontSize:11,background:'#532',color:'#ffd7d7',border:'1px solid #7a4636',padding:'4px 10px',borderRadius:6,cursor:'pointer'}}>Dismiss</button>
         </div>
