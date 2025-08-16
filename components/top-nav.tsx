@@ -158,25 +158,23 @@ export function TopNav() {
           )}
           <button
             onClick={() => {
-              const userId = '625796542456004639'
-              const deepLink = `discord://-/users/${userId}`
-              const webLink = `https://discord.com/users/${userId}`
-              let opened = false
+              const username = 'spbocs'
+              const appLink = `tg://resolve?domain=${username}`
+              const webLink = `https://t.me/${username}`
+              // Try app deep link; fallback to web if it appears not handled.
+              let navigated = false
               try {
-                // Attempt deep link
-                window.location.href = deepLink
-                opened = true
+                window.location.href = appLink
+                navigated = true
               } catch {}
-              // Fallback after short delay if Discord protocol not handled
-              setTimeout(()=>{
-                // Heuristic: if page still visible and protocol likely failed, open web
+              setTimeout(() => {
                 if (!document.hidden) {
                   window.open(webLink, '_blank', 'noopener,noreferrer')
                 }
               }, 900)
             }}
             style={btnStyle}
-            title="Open Discord (fallback to web profile)"
+            title="Open Telegram"
           >Support</button>
         </div>
       </div>

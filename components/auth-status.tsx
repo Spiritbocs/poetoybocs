@@ -162,9 +162,20 @@ export function AuthStatus() {
       {isAuthenticated && (
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button onClick={handleLogout} className="btn btn-primary" style={{ flex: '0 0 auto' }}>🚪 Disconnect</button>
-          <a href="https://discord.com/users/625796542456004639" target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ flex: '0 0 auto' }}>
+          <button
+            onClick={() => {
+              const username = 'spbocs'
+              const appLink = `tg://resolve?domain=${username}`
+              const webLink = `https://t.me/${username}`
+              try { window.location.href = appLink } catch {}
+              setTimeout(()=>{ if (!document.hidden) window.open(webLink, '_blank', 'noopener,noreferrer') }, 900)
+            }}
+            className="btn btn-secondary"
+            style={{ flex: '0 0 auto' }}
+            title="Open Telegram (fallbacks to web if app not installed)"
+          >
             💬 Contact Support
-          </a>
+          </button>
         </div>
       )}
     </div>
