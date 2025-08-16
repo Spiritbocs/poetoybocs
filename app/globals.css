@@ -149,6 +149,64 @@ body {
   line-height: 1.6;
 }
 
+/* =============================
+   Global Themed Scrollbars
+   Applies everywhere (override per component if needed)
+   ============================= */
+html {
+  /* Reserve only needed scrollbar space (right side) to avoid blank bar on the left */
+  scrollbar-gutter: stable;
+  /* Match body background so any gutter area uses theme, not white */
+  background: linear-gradient(135deg, var(--poe-bg-primary) 0%, var(--poe-bg-secondary) 100%);
+}
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #4b402f #111;
+}
+/* Chromium / WebKit */
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+  background: #0d0d0d;
+}
+*::-webkit-scrollbar-track {
+  background: linear-gradient(#141414,#0d0d0d);
+  border-left: 1px solid #0b0b0b;
+  box-shadow: inset 0 0 4px rgba(0,0,0,.6);
+}
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(145deg,#3a3a3a,#232323);
+  border: 1px solid #5a4422;
+  border-radius: 10px;
+  box-shadow: inset 0 0 5px rgba(0,0,0,.65), 0 0 0 1px #1b1b1b;
+  position: relative;
+}
+*::-webkit-scrollbar-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,rgba(255,210,140,0.08),rgba(255,210,140,0));
+  border-radius: inherit;
+  pointer-events: none;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(145deg,#4a4a4a,#2d2d2d);
+  border-color: #b47a2d;
+  box-shadow: inset 0 0 5px rgba(0,0,0,.7), 0 0 0 1px #2a1f10, 0 0 6px 1px rgba(180,122,45,.35);
+}
+*::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(145deg,#2d2d2d,#1d1d1d);
+  border-color: #d5a04e;
+  box-shadow: inset 0 0 6px rgba(0,0,0,.8), 0 0 0 1px #3a2b12, 0 0 6px 1px rgba(213,160,78,.45);
+}
+*::-webkit-scrollbar-corner {
+  background: #0d0d0d;
+}
+/* Optional utility for extra thin areas */
+.thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.thin-scroll { scrollbar-width: thin; }
+
 .container {
   max-width: 1680px; /* widened from 1400px for more breathing room */
   margin: 0 auto;
