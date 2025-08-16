@@ -48,6 +48,8 @@ export function ItemPriceChecker() {
     setCooldownActiveKey(null)
   }
   const [error, setError] = useState<string | null>(null)
+  // Capture extra metadata when upstream 403 occurs so we can render a guidance banner
+  const [forbiddenMeta, setForbiddenMeta] = useState<{ hint?: string; sessionAttached?: boolean; consecutiveForbidden?: number }|null>(null)
   const [tradeSearchId, setTradeSearchId] = useState<string | null>(null)
   // Quick filter state (mirrors the overlay)
   const [rarityFilter, setRarityFilter] = useState<string>('any')
@@ -278,7 +280,14 @@ export function ItemPriceChecker() {
           const secs = parseInt(e.message.split(':')[1]||'0',10)
           setError(`Rate limited – wait ${secs}s before retrying.`)
         } else if (typeof e?.message === 'string' && e.message.startsWith('forbidden_upstream:')) {
-          setError('Forbidden by upstream trade site (Cloudflare). Try again in a minute; if persistent, open trade site in a browser tab to refresh cookies.')
+          try {
+            const jsonPart = e.message.replace('forbidden_upstream:','')
+            const parsed = JSON.parse(jsonPart)
+            setForbiddenMeta({ hint: parsed?.hint, sessionAttached: parsed?.sessionAttached, consecutiveForbidden: parsed?.consecutiveForbidden })
+            setError('Forbidden by trade site – anti-bot protection. See guidance below.')
+          } catch {
+            setError('Forbidden by upstream trade site (Cloudflare). Try again later or open official trade site to refresh cookies.')
+          }
         } else {
           setError('Search failed')
         }
@@ -433,7 +442,13 @@ export function ItemPriceChecker() {
     msg = `Rate limited – wait ${secs}s before retrying.`
   }
   if ((raw||'').startsWith('forbidden_upstream:')) {
-    msg = 'Forbidden by upstream trade site (Cloudflare). Try again shortly or open the official trade site once to establish cookies.'
+    try {
+      const js = JSON.parse(raw.replace('forbidden_upstream:',''))
+      setForbiddenMeta({ hint: js?.hint, sessionAttached: js?.sessionAttached, consecutiveForbidden: js?.consecutiveForbidden })
+      msg = 'Forbidden by trade site – anti-bot protection. Guidance below.'
+    } catch {
+      msg = 'Forbidden by upstream trade site (Cloudflare). Try again shortly or open the official trade site once to establish cookies.'
+    }
   } else if ((raw||'').startsWith('proxy_http_')) {
     const payload = raw.replace(/^proxy_http_\d+\s*/, '')
     try {
@@ -1152,6 +1167,33 @@ export function ItemPriceChecker() {
 
   return (
     <div>
+      {/* Upstream 403 guidance banner */}
+      {forbiddenMeta && (
+        <div style={{
+          background:'linear-gradient(145deg,#3b1e1e,#2a1212)',
+          border:'1px solid #6a2c2c',
+          padding:'10px 14px',
+          marginBottom:14,
+          borderRadius:8,
+          boxShadow:'0 0 0 1px #000, inset 0 0 12px rgba(0,0,0,.6)'
+        }}>
+          <div style={{fontWeight:600,color:'#ffb4b4',marginBottom:4,fontSize:13}}>Trade API Forbidden (HTTP 403)</div>
+          <div style={{fontSize:12,lineHeight:1.4,color:'#f1dada'}}>
+            The official trade site is blocking this server's IP (Cloudflare / anti-bot).{ ' ' }
+            {forbiddenMeta.hint && <><br/>Hint: {forbiddenMeta.hint}</>}
+            {!forbiddenMeta.sessionAttached && <><br/>Session cookie not attached. You can provide a POE_TRADE_SESSION_ID env var (value of your POESESSID cookie) on the server to reduce blocking. Do NOT expose it client-side.</>}
+            <br/>Options:
+            <ul style={{margin:'6px 0 4px 18px',padding:0}}>
+              <li>Open https://www.pathofexile.com/trade in a browser while logged in (refresh cookies) then retry.</li>
+              <li>Set server env POE_TRADE_SESSION_ID to your POESESSID (private) and redeploy.</li>
+              <li>Run locally / self-host with a residential IP.</li>
+              <li>Implement an external proxy with caching & allow-list (optional).</li>
+            </ul>
+            Until resolved you can still paste items to get ML estimate from poeprices.info (if available) and manual valuation using poe.ninja reference values.
+          </div>
+          <button onClick={()=> setForbiddenMeta(null)} style={{marginTop:8,fontSize:11,background:'#532',color:'#ffd7d7',border:'1px solid #7a4636',padding:'4px 10px',borderRadius:6,cursor:'pointer'}}>Dismiss</button>
+        </div>
+      )}
       <div style={{display:'flex',gap:12,marginBottom:16}}>
         <div className="segmented">
           <button className={mode==='clipboard'? 'active':''} onClick={()=>persistMode('clipboard')}>Clipboard Paste</button>
