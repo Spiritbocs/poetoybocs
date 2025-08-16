@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { LeagueProvider } from '@/components/league-context'
+import { Analytics } from '@vercel/analytics/next'
 
 export const metadata: Metadata = {
   title: 'Spiritbocs Tracker',
@@ -35,7 +36,8 @@ html {
             </ErrorBoundary>
           </div>
         </LeagueProvider>
-        <footer style={{padding:'16px 24px',fontSize:12,display:'flex',justifyContent:'center',borderTop:'1px solid #222',background:'#111',color:'#aaa'}}>
+  <Analytics />
+  <footer style={{padding:'16px 24px',fontSize:12,display:'flex',justifyContent:'center',borderTop:'1px solid #222',background:'#111',color:'#aaa'}}>
           <span style={{opacity:.9}}>Spiritbocs© 2025 — Not affiliated with Grinding Gear Games</span>
         </footer>
       </body>

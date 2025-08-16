@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { poeApi, type League } from '@/lib/poe-api'
 import { useLeague } from './league-context'
 
+
 export function TopNav() {
   const { league, realm, setLeague, setRealm } = useLeague()
   const [isAuth, setIsAuth] = useState(false)
