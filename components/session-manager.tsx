@@ -29,7 +29,37 @@ export function SessionManager({ onSessionReady, isTradeEnabled, league }: Sessi
   const validateSession = async (id: string) => {
     setIsValidating(true)
     try {
-      // First try server-side validation
+      // Desktop/Electron app: Use direct validation (much more reliable)
+      if (typeof window !== 'undefined' && (window as any).electronAPI) {
+        console.log('[SessionManager] Desktop mode - using direct validation')
+        try {
+          const { electronTradeAPI } = await import('../lib/electron-trade-api')
+          const desktopTest = await electronTradeAPI.testConnection(league, id)
+          
+          if (desktopTest.success) {
+            setValidationResult({
+              valid: true,
+              message: `✅ Desktop: Session working via ${desktopTest.method} (no IP restrictions!)`
+            })
+            localStorage.setItem('poe_session_id', id)
+            onSessionReady(id)
+            setIsValidating(false)
+            return
+          } else {
+            setValidationResult({
+              valid: false,
+              message: `❌ Desktop: ${desktopTest.error}`
+            })
+            setIsValidating(false)
+            return
+          }
+        } catch (desktopError) {
+          console.error('[SessionManager] Desktop validation failed:', desktopError)
+          // Continue to web fallback
+        }
+      }
+
+      // Web app fallback: Try server-side validation first
       const serverRes = await fetch('/api/session/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

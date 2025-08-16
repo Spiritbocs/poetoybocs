@@ -745,6 +745,27 @@ private oauthConfig: OAuthConfig = {
   }
 
   async searchItems(league: string, query: any): Promise<TradeSearchResult> {
+    // Desktop/Electron app: Use direct API access (bypasses all web restrictions)
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      console.log('[poe-api] Desktop mode detected, using direct API')
+      try {
+        const userSessionId = localStorage.getItem('poe_session_id')
+        const { electronTradeAPI } = await import('./electron-trade-api')
+        
+        const result = await electronTradeAPI.searchTrade({
+          league,
+          query,
+          sessionId: userSessionId || undefined
+        })
+        
+        console.log('[poe-api] Desktop API success:', result.total, 'results')
+        return result
+      } catch (desktopError) {
+        console.error('[poe-api] Desktop API failed, falling back to web methods:', desktopError)
+        // Continue to web fallback below
+      }
+    }
+
     // If global cooldown active, wait (short-circuit) so we don't spam upstream
     if (Date.now() < globalRateLimitUntil) {
       const waitMs = globalRateLimitUntil - Date.now()
