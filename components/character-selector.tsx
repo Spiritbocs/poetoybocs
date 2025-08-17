@@ -104,7 +104,7 @@ export function CharacterSelector({ onCharacterSelect, onShowDetail, isAuthentic
 
   if (!isAuthenticated) {
     return (
-      <div className="card" style={{ padding: '1rem', margin: '1rem 0', textAlign: 'center', color: '#6c757d' }}>
+      <div className="card" style={{ padding: '1rem', margin: '1rem 0', textAlign: 'center', color: 'var(--poe-text-secondary)' }}>
         <div style={{ marginBottom: '0.5rem' }}>👤</div>
         <div>Login to access character data</div>
       </div>
@@ -117,24 +117,24 @@ export function CharacterSelector({ onCharacterSelect, onShowDetail, isAuthentic
         <h3 style={{ margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           🏃 Character Selector
           {selectedCharacter && (
-            <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: '#6c757d' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--poe-text-secondary)' }}>
               {getLeagueIcon(selectedCharacter.league)} {selectedCharacter.league}
             </span>
           )}
         </h3>
-        <p style={{ margin: 0, color: '#6c757d', fontSize: '0.9rem' }}>
+        <p style={{ margin: 0, color: 'var(--poe-text-secondary)', fontSize: '0.9rem' }}>
           {characters.length > 0 ? `${characters.length} characters available` : 'Managing your PoE characters'}
         </p>
       </div>
       
       <div style={{ padding: '1rem' }}>
         {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#6c757d' }}>
+          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--poe-text-secondary)' }}>
             <div style={{ marginBottom: '0.5rem' }}>⏳</div>
             <div>Loading characters...</div>
           </div>
         ) : error ? (
-          <div style={{ textAlign: 'center', padding: '1rem', color: '#dc3545' }}>
+          <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--poe-red)' }}>
             <div style={{ marginBottom: '0.5rem' }}>❌</div>
             <div>{error}</div>
             <button 
@@ -146,7 +146,7 @@ export function CharacterSelector({ onCharacterSelect, onShowDetail, isAuthentic
             </button>
           </div>
         ) : characters.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#6c757d' }}>
+          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--poe-text-secondary)' }}>
             <div style={{ marginBottom: '0.5rem' }}>🎮</div>
             <div>No characters found</div>
             <div style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
@@ -181,8 +181,8 @@ export function CharacterSelector({ onCharacterSelect, onShowDetail, isAuthentic
                 className="card" 
                 style={{ 
                   padding: '1rem',
-                  backgroundColor: '#f8f9fa',
-                  border: '2px solid #007bff'
+                  backgroundColor: 'var(--poe-bg-card)',
+                  border: '2px solid var(--poe-accent)'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -200,10 +200,10 @@ export function CharacterSelector({ onCharacterSelect, onShowDetail, isAuthentic
                     <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
                       {selectedCharacter.name}
                     </div>
-                    <div style={{ color: '#6c757d', fontSize: '0.9rem' }}>
+                    <div style={{ color: 'var(--poe-text-secondary)', fontSize: '0.9rem' }}>
                       Level {selectedCharacter.level} {selectedCharacter.ascendancyClass ? `Asc${selectedCharacter.ascendancyClass}` : selectedCharacter.class}
                     </div>
-                    <div style={{ color: '#6c757d', fontSize: '0.8rem' }}>
+                    <div style={{ color: 'var(--poe-text-secondary)', fontSize: '0.8rem' }}>
                       {getLeagueIcon(selectedCharacter.league)} {selectedCharacter.league || 'Unknown League'}
                     </div>
                   </div>
@@ -211,7 +211,7 @@ export function CharacterSelector({ onCharacterSelect, onShowDetail, isAuthentic
                 
                 {/* Future: Add last active time if available */}
                 {selectedCharacter.lastActive && (
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#6c757d' }}>
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--poe-text-secondary)' }}>
                     Last Active: {new Date(selectedCharacter.lastActive).toLocaleDateString()}
                   </div>
                 )}
