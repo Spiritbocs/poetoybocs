@@ -1,5 +1,8 @@
 # PoE Toy Bocs - Development Kanban Board
 
+> **📌 Auto-Sync Enabled**: This markdown file automatically syncs with GitHub Issues!  
+> **🔄 To sync manually**: Run `sync-kanban.bat` or see [automation setup](#automation-setup) below.
+
 ## 🎯 Current Sprint Focus
 
 ### 🔥 **Phase 1 Completion** (Desktop Foundation)
@@ -239,3 +242,56 @@
 2. Vote on important features
 3. Track development progress
 4. Provide feedback on completed features
+
+---
+
+## 🔄 Automation Setup
+
+### Auto-Sync KANBAN.md → GitHub Issues
+
+This kanban board automatically creates GitHub Issues from the markdown file.
+
+#### Method 1: Automatic (GitHub Actions)
+- Syncs automatically when KANBAN.md is updated
+- No manual setup required
+- Issues are created with proper labels and milestones
+
+#### Method 2: Manual Sync (Windows)
+```batch
+# Set your GitHub token (one-time setup)
+set GITHUB_TOKEN=your_personal_access_token
+
+# Run the sync script
+sync-kanban.bat
+```
+
+#### Method 3: Manual Sync (Python)
+```bash
+# Install dependencies
+pip install PyGithub
+
+# Set environment variables
+export GITHUB_TOKEN=your_personal_access_token
+export GITHUB_REPO=Spiritbocs/poetoybocs
+
+# Run sync script
+python scripts/sync-kanban.py
+```
+
+### Creating GitHub Personal Access Token
+1. Go to [GitHub Settings → Tokens](https://github.com/settings/tokens)
+2. Click "Generate new token (classic)"
+3. Select scopes: `repo` (full repository access)
+4. Copy the token and set it as environment variable
+
+### How It Works
+- **Parses** numbered items from KANBAN.md
+- **Creates** GitHub Issues with proper labels and titles
+- **Avoids duplicates** by checking existing issues
+- **Maintains sync** between documentation and project board
+
+### Labels Auto-Generated
+- `phase-X-name` - Development phase
+- `priority-level` - Issue priority  
+- `component-type` - Component category
+- `kanban-sync` - Auto-synced from markdown

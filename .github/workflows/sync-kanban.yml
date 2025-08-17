@@ -1,0 +1,88 @@
+name: Sync Kanban Issues
+
+on:
+  push:
+    paths:
+      - 'KANBAN.md'
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  sync-kanban:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Parse Kanban and Create Issues
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const kanbanContent = fs.readFileSync('KANBAN.md', 'utf8');
+            
+            // Parse kanban markdown for issue patterns
+            const issuePattern = /^\d+\.\s\*\*\[(\w+)\]\s([^*]+)\*\*/gm;
+            const issues = [];
+            let match;
+            
+            while ((match = issuePattern.exec(kanbanContent)) !== null) {
+              const type = match[1];
+              const title = match[2].trim();
+              
+              // Extract labels and description
+              const labelPattern = /Labels:\s*`([^`]+)`/;
+              const descPattern = /- ([^\\n]+)/g;
+              
+              const sectionStart = match.index;
+              const sectionEnd = kanbanContent.indexOf('\n\n', sectionStart);
+              const section = kanbanContent.slice(sectionStart, sectionEnd);
+              
+              const labelMatch = section.match(labelPattern);
+              const labels = labelMatch ? labelMatch[1].split('`, `') : ['kanban-sync'];
+              
+              issues.push({
+                title: `[${type}] ${title}`,
+                body: section,
+                labels: labels
+              });
+            }
+            
+            console.log(`Found ${issues.length} issues to sync`);
+            
+            // Get existing issues
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'kanban-sync',
+              state: 'all'
+            });
+            
+            console.log(`Found ${existingIssues.data.length} existing kanban issues`);
+            
+            // Create new issues that don't exist
+            for (const issue of issues) {
+              const exists = existingIssues.data.some(existing => 
+                existing.title === issue.title
+              );
+              
+              if (!exists) {
+                console.log(`Creating issue: ${issue.title}`);
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: issue.title,
+                  body: issue.body,
+                  labels: [...issue.labels, 'kanban-sync']
+                });
+              } else {
+                console.log(`Issue already exists: ${issue.title}`);
+              }
+            }
