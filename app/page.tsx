@@ -2,39 +2,64 @@
 
 import { useState, useEffect } from "react"
 import { TopNav } from "@/components/top-nav"
-import { AuthStatus } from "@/components/auth-status"
 import { CurrencyTracker } from "@/components/currency-tracker"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { ItemOverviewTable } from "@/components/item-overview-table"
 import { ItemPriceChecker } from "@/components/item-price-checker"
 import { SessionManager } from "@/components/session-manager"
 import { DesktopSessionManager } from "@/components/desktop-session-manager"
-import { CharacterViewer } from "@/components/character-viewer"
-import { AtlasViewer } from "@/components/atlas-viewer"
-import { PassiveTreeViewer } from "@/components/passive-tree-viewer"
+import { CharacterSelector } from "@/components/character-selector"
+import { CharacterDetailView } from "@/components/character-detail-view"
+import { AuthStatus } from "@/components/auth-status"
 import { useLeague } from "@/components/league-context"
-
-type AppSection = "market" | "characters" | "atlas" | "passive-tree" | "settings"
+import { CharacterSummary } from "@/lib/poe-api"
 
 export default function HomePage() {
-  const [activeSection, setActiveSection] = useState<AppSection>("market")
   const [activeTab, setActiveTab] = useState<"currency" | "items">("currency")
   const [sessionReady, setSessionReady] = useState(false)
   const [userSessionId, setUserSessionId] = useState<string>('')
   const [isDesktopMode, setIsDesktopMode] = useState(false)
-  const [oauthReady, setOauthReady] = useState(false)
+  const [selectedCharacter, setSelectedCharacter] = useState<CharacterSummary | null>(null)
+  const [showCharacterDetail, setShowCharacterDetail] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   
   // Consume shared league/realm from context (TopNav now manages selection)
   const { league, realm } = useLeague()
+  const [activeSection, setActiveSection] = useState<{ key: string; label: string; type?: "Currency" | "Fragment" }>({ key: 'currency', label: 'Currency', type: 'Currency' })
 
   // Detect if running in desktop mode
   useEffect(() => {
     setIsDesktopMode(typeof window !== 'undefined' && !!(window as any).electronAPI)
   }, [])
 
+  // Track authentication status
+  useEffect(() => {
+    const checkAuth = () => {
+      const { poeApi } = require('@/lib/poe-api')
+      setIsAuthenticated(poeApi.isAuthenticated())
+    }
+    
+    checkAuth()
+    
+    // Listen for auth changes
+    const interval = setInterval(checkAuth, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
   const handleSessionReady = (sessionId: string) => {
     setUserSessionId(sessionId)
     setSessionReady(true)
+  }
+
+  const handleCharacterSelect = (character: CharacterSummary | null) => {
+    setSelectedCharacter(character)
+    console.log('[HomePage] Character selected:', character?.name)
+  }
+
+  const handleShowCharacterDetail = () => {
+    if (selectedCharacter) {
+      setShowCharacterDetail(true)
+    }
   }
 
   return (
@@ -53,6 +78,19 @@ export default function HomePage() {
           )}
         </div>
       )}
+
+      {/* Character Management Section */}
+      <div style={{ marginBottom: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1rem' }}>
+        {/* OAuth Authentication Status */}
+        <AuthStatus />
+        
+        {/* Character Selector */}
+        <CharacterSelector 
+          onCharacterSelect={handleCharacterSelect}
+          onShowDetail={handleShowCharacterDetail}
+          isAuthenticated={isAuthenticated}
+        />
+      </div>
 
       <div className="layout-split">
         <SidebarNav
@@ -98,6 +136,14 @@ export default function HomePage() {
         </div>
       </div>
       </div>
+
+      {/* Character Detail Modal */}
+      {showCharacterDetail && selectedCharacter && (
+        <CharacterDetailView 
+          character={selectedCharacter}
+          onClose={() => setShowCharacterDetail(false)}
+        />
+      )}
     </>
   )
 }
