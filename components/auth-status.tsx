@@ -45,11 +45,22 @@ export function AuthStatus() {
   const handleLogin = async () => {
     try {
       console.log("[AuthStatus] Starting login process...")
+      
+      // Check if running in desktop mode
+      const isDesktop = typeof window !== 'undefined' && !!(window as any).electronAPI
+      
       const authUrl = await poeApi.getAuthUrl()
       console.log("[AuthStatus] Auth URL generated:", authUrl?.substring(0, 100) + "...")
+      
       if (authUrl) {
-        console.log("[AuthStatus] Redirecting to PoE...")
-        window.location.href = authUrl
+        if (isDesktop) {
+          console.log("[AuthStatus] Desktop mode - opening auth in external browser")
+          // In desktop mode, open in external browser
+          window.open(authUrl, '_blank')
+        } else {
+          console.log("[AuthStatus] Web mode - redirecting to PoE...")
+          window.location.href = authUrl
+        }
       } else {
         console.log("[AuthStatus] No auth URL - using popup flow")
         // Popup handled authentication; refresh local state

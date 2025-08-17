@@ -35,16 +35,29 @@ export function DesktopSessionManager({ onSessionReady, isTradeEnabled, league }
       // Check auto-detection capability (desktop only)
       if ((window as any).electronAPI) {
         try {
+          console.log('[DesktopSessionManager] Attempting auto-detection...')
           const detection = await (window as any).electronAPI.detectPoeSession()
+          console.log('[DesktopSessionManager] Auto-detection result:', detection)
+          
           setAutoDetectionStatus(detection)
           
           if (detection.success && detection.sessionId) {
+            console.log('[DesktopSessionManager] Auto-detected session, validating...')
             setSessionId(detection.sessionId)
             validateSession(detection.sessionId)
+          } else {
+            console.log('[DesktopSessionManager] Auto-detection available but no session found')
           }
         } catch (error) {
-          console.log('[DesktopSessionManager] Auto-detection not available:', error)
+          console.log('[DesktopSessionManager] Auto-detection failed:', error)
+          setAutoDetectionStatus({
+            available: false,
+            method: 'manual',
+            message: 'Auto-detection failed, manual entry required'
+          })
         }
+      } else {
+        console.log('[DesktopSessionManager] Not running in desktop mode')
       }
     }
 

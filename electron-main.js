@@ -90,39 +90,98 @@ ipcMain.handle('detect-poe-session', async () => {
   try {
     const os = require('os')
     const path = require('path')
+    const sqlite3 = require('sqlite3').verbose()
+    
+    console.log('[detect-poe-session] Starting session auto-detection...')
     
     // Chrome/Edge cookie paths on Windows
-    const chromePaths = [
-      path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cookies'),
-      path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Cookies')
+    const browserPaths = [
+      {
+        name: 'Chrome',
+        path: path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cookies')
+      },
+      {
+        name: 'Edge',
+        path: path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Cookies')
+      }
     ]
     
     // Try to find POESESSID in browser cookies
-    for (const cookiePath of chromePaths) {
-      if (fs.existsSync(cookiePath)) {
+    for (const browser of browserPaths) {
+      if (fs.existsSync(browser.path)) {
         try {
-          // Note: Real implementation would use sqlite3 to read Chrome cookies
-          // For now, return a placeholder that indicates auto-detection is available
-          return {
-            success: true,
-            method: 'browser_auto_detect',
-            message: 'Desktop app can auto-detect session (feature in development)'
+          console.log(`[detect-poe-session] Checking ${browser.name} cookies...`)
+          
+          const sessionId = await new Promise((resolve, reject) => {
+            // Create a temporary copy to avoid database lock issues
+            const tempPath = browser.path + '.temp'
+            fs.copyFileSync(browser.path, tempPath)
+            
+            const db = new sqlite3.Database(tempPath, sqlite3.OPEN_READONLY, (err) => {
+              if (err) {
+                console.log(`[detect-poe-session] ${browser.name} database error:`, err.message)
+                resolve(null)
+                return
+              }
+              
+              // Query for POESESSID cookie
+              db.get(
+                "SELECT name, value FROM cookies WHERE host_key LIKE '%pathofexile.com%' AND name = 'POESESSID'",
+                (err, row) => {
+                  db.close()
+                  
+                  // Clean up temp file
+                  try {
+                    fs.unlinkSync(tempPath)
+                  } catch (e) {
+                    console.log('[detect-poe-session] Temp file cleanup failed:', e.message)
+                  }
+                  
+                  if (err) {
+                    console.log(`[detect-poe-session] ${browser.name} query error:`, err.message)
+                    resolve(null)
+                  } else if (row && row.value) {
+                    console.log(`[detect-poe-session] Found POESESSID in ${browser.name}!`)
+                    resolve(row.value)
+                  } else {
+                    console.log(`[detect-poe-session] No POESESSID found in ${browser.name}`)
+                    resolve(null)
+                  }
+                }
+              )
+            })
+          })
+          
+          if (sessionId) {
+            return {
+              success: true,
+              sessionId: sessionId,
+              method: `browser_auto_detect_${browser.name.toLowerCase()}`,
+              message: `Auto-detected session from ${browser.name} browser`
+            }
           }
+          
         } catch (error) {
-          console.log('[poe-session] Could not read cookies from:', cookiePath)
+          console.log(`[detect-poe-session] Could not read ${browser.name} cookies:`, error.message)
         }
+      } else {
+        console.log(`[detect-poe-session] ${browser.name} not found at:`, browser.path)
       }
     }
     
+    console.log('[detect-poe-session] No session found in any browser')
     return {
       success: false,
       method: 'manual',
       message: 'Auto-detection not available, manual session entry required'
     }
   } catch (error) {
+    console.error('[detect-poe-session] Auto-detection failed:', error)
     return {
       success: false,
-      error: error.message
+      error: error.message,
+      method: 'manual',
+      message: 'Auto-detection failed, manual session entry required'
     }
   }
 })
