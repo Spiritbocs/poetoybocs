@@ -124,7 +124,7 @@ export function DesktopSessionManager({ onSessionReady, isTradeEnabled, league }
 
   if (isTradeEnabled && validationResult?.valid) {
     return (
-      <div className="card" style={{ backgroundColor: '#d4edda', borderColor: '#c3e6cb', color: '#155724', padding: '1rem', margin: '1rem 0' }}>
+      <div className="card" style={{ backgroundColor: 'var(--poe-green)', borderColor: 'var(--poe-green)', color: 'var(--poe-bg-primary)', padding: '1rem', margin: '1rem 0' }}>
         ✅ Trade features active! Desktop mode provides direct PoE API access.
       </div>
     )
@@ -136,7 +136,7 @@ export function DesktopSessionManager({ onSessionReady, isTradeEnabled, league }
         <h3 style={{ margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           🖥️ Desktop Trade Setup
         </h3>
-        <p style={{ margin: 0, color: '#6c757d', fontSize: '0.9rem' }}>
+        <p style={{ margin: 0, color: 'var(--poe-text-secondary)', fontSize: '0.9rem' }}>
           Like Awakened PoE Trade - simple session setup for full trade access
         </p>
       </div>
@@ -150,8 +150,9 @@ export function DesktopSessionManager({ onSessionReady, isTradeEnabled, league }
               className="card" 
               style={{ 
                 padding: '0.75rem',
-                backgroundColor: autoDetectionStatus.available ? '#e8f5e8' : '#fff3cd',
-                borderColor: autoDetectionStatus.available ? '#c3e6cb' : '#ffeaa7'
+                backgroundColor: autoDetectionStatus.available ? 'var(--poe-green)' : 'var(--poe-orange)',
+                borderColor: autoDetectionStatus.available ? 'var(--poe-green)' : 'var(--poe-orange)',
+                color: 'var(--poe-bg-primary)'
               }}
             >
               <strong>{autoDetectionStatus.available ? '🔍 Auto-Detection:' : '📋 Manual Setup:'}</strong>
@@ -170,7 +171,7 @@ export function DesktopSessionManager({ onSessionReady, isTradeEnabled, league }
             🚀 Quick Setup - Open PoE Trade
           </button>
           
-          <div style={{ textAlign: 'center', fontSize: '0.9rem', color: '#6c757d' }}>
+          <div style={{ textAlign: 'center', fontSize: '0.9rem', color: 'var(--poe-text-secondary)' }}>
             After logging in, copy your POESESSID:
           </div>
           
@@ -194,7 +195,7 @@ export function DesktopSessionManager({ onSessionReady, isTradeEnabled, league }
           </div>
 
           {/* Simple instructions */}
-          <div style={{ fontSize: '0.85rem', color: '#6c757d', lineHeight: '1.4' }}>
+          <div style={{ fontSize: '0.85rem', color: 'var(--poe-text-secondary)', lineHeight: '1.4' }}>
             <strong>How to get POESESSID:</strong>
             <ol style={{ marginTop: '0.5rem', paddingLeft: '1.2rem' }}>
               <li>Click "Quick Setup" above</li>
@@ -212,9 +213,9 @@ export function DesktopSessionManager({ onSessionReady, isTradeEnabled, league }
             style={{ 
               marginTop: '1rem',
               padding: '1rem',
-              backgroundColor: validationResult.valid ? '#d4edda' : '#f8d7da',
-              borderColor: validationResult.valid ? '#c3e6cb' : '#f5c6cb',
-              color: validationResult.valid ? '#155724' : '#721c24'
+              backgroundColor: validationResult.valid ? 'var(--poe-green)' : 'var(--poe-red)',
+              borderColor: validationResult.valid ? 'var(--poe-green)' : 'var(--poe-red)',
+              color: 'var(--poe-bg-primary)'
             }}
           >
             {validationResult.message}

@@ -23,7 +23,7 @@ function createWindow() {
   // Load the built Next.js app locally instead of web version
   const isDev = process.env.NODE_ENV === 'development'
   const startUrl = isDev 
-    ? 'http://localhost:3001' 
+    ? 'http://localhost:3000' 
     : 'https://poetoybocs.vercel.app' // Fallback to web version for now
   
   console.log('[electron] App ready, version:', app.getVersion())
